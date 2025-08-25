@@ -64,6 +64,10 @@ class ViewBoosterBot:
         # Register admin message handlers
         self.dp.message.register(self.admin_handler.handle_message,
                                lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
+        
+        # Register user message handlers  
+        self.dp.message.register(self.user_handler.handle_message,
+                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
         """Handle /start command - Admin only"""
