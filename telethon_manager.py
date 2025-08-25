@@ -337,17 +337,26 @@ class TelethonManager:
         successful_accounts = 0
         used_accounts = []
         
-        # Use ALL available accounts for maximum boost effect  
-        available_sessions = list(self.active_clients.keys())
+        # Use ALL available accounts for maximum boost effect
+        available_sessions = self.active_clients.copy()  # Copy list of session names
+        
+        # Iterate through all available accounts
         for session_name in available_sessions:
             if session_name in used_accounts:
                 continue
                 
-            client_data = await self.get_next_available_client()
-            if not client_data:
+            # Get the specific client for this session
+            if session_name not in self.clients:
                 continue
                 
-            client, account = client_data
+            client = self.clients[session_name]
+            
+            # Get account info from database
+            accounts = await self.db.get_active_accounts()
+            account = next((acc for acc in accounts if acc["session_name"] == session_name), None)
+            if not account:
+                continue
+                
             used_accounts.append(session_name)
             
             try:
