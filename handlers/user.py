@@ -76,6 +76,8 @@ class UserHandler:
             await self.handle_setting(callback_query, data)
         elif data.startswith("delay_"):
             await self.handle_delay_setting(callback_query, data)
+        elif data.startswith("auto_count_"):
+            await self.handle_auto_count_setting(callback_query, data)
         elif data.startswith("confirm:"):
             await self.handle_confirmation(callback_query, data)
         elif data == "cancel_action" or data == "cancel_operation":
@@ -468,26 +470,30 @@ Choose a channel below:
             # Store channel info in state
             await state.update_data(boost_channel_id=channel_id, boost_channel_link=channel["channel_link"])
             
+            auto_count = await self.get_user_setting(user_id, "auto_message_count") or 10
             text = f"""
 ⚡ **Instant Boost**
 
 Channel: {channel.get("title") or channel["channel_link"]}
 
 **Option 1: Auto-detect messages**
-Send "auto" to boost the latest 10 messages automatically.
+Send "auto" to boost the latest {auto_count} messages automatically.
 
 **Option 2: Specific messages**
-Send message IDs separated by commas or spaces.
+Send message IDs or message links separated by commas or spaces.
 Examples:
 • 123, 124, 125
 • 100 101 102
 • 50-55 (range)
+• https://t.me/channel/123
+• https://t.me/c/1234567890/456
 
 **Current Settings:**
 Views + Read: {'✅' if not await self.get_user_setting(user_id, 'views_only') else '❌'}
 Account Rotation: {'✅' if await self.get_user_setting(user_id, 'account_rotation') else '❌'}
+Auto Count: {auto_count} messages
 
-Send message IDs or "auto", or /cancel to abort.
+Send message IDs/links or "auto", or /cancel to abort.
             """
             
             if callback_query.message:
@@ -582,8 +588,9 @@ Send message IDs or "auto", or /cancel to abort.
         
         # Process message IDs
         if input_text.lower() == "auto":
-            # Auto-detect recent messages
-            message_ids = await self.telethon.get_channel_messages(channel_link, limit=10)
+            # Auto-detect recent messages using user's setting
+            auto_count = await self.get_user_setting(user_id, "auto_message_count") or 10
+            message_ids = await self.telethon.get_channel_messages(channel_link, limit=auto_count)
             if not message_ids:
                 await message.answer("❌ Could not find recent messages in the channel.")
                 return
@@ -670,8 +677,9 @@ Send message IDs or "auto", or /cancel to abort.
         
         # Process message IDs
         if input_text.lower() == "auto":
-            # Auto-detect recent messages
-            message_ids = await self.telethon.get_channel_messages(channel_link, limit=10)
+            # Auto-detect recent messages using user's setting
+            auto_count = await self.get_user_setting(user_id, "auto_message_count") or 10
+            message_ids = await self.telethon.get_channel_messages(channel_link, limit=auto_count)
             if not message_ids:
                 await message.answer("❌ Could not find recent messages in the channel.")
                 return
@@ -701,12 +709,13 @@ Send message IDs or "auto", or /cancel to abort.
             
             if success:
                 # Update channel boost count (treat reactions as boosts in stats)
-                await self.db.update_channel_boosts(channel_id, reaction_count)
+                await self.db.update_channel_boost(channel_id, reaction_count)
                 
                 # Log the action
                 await self.db.log_action(
                     LogType.BOOST,
-                    channel_link=channel_link,
+                    user_id=user_id,
+                    channel_id=channel_id,
                     message=f"Added {reaction_count} emoji reactions to messages: {message_ids[:5]}"
                 )
                 
@@ -886,8 +895,41 @@ Select a channel below to start:
                 )
             await callback_query.answer()
         
-        # Refresh settings if not delay
-        if data != "setting_delay":
+        elif data == "setting_auto_count":
+            current_count = await self.get_user_setting(user_id, "auto_message_count") or 10
+            text = f"""
+📊 **Auto Message Count Configuration**
+
+┌──── 🎯 **Auto Mode Settings** ────┐
+│
+│ Configure how many messages to boost
+│ when using "auto" mode:
+│
+└──────────────────────────────────┘
+
+**Current Setting:** {current_count} messages
+
+🎯 **Choose Message Count:**
+
+**1 Message** - Single latest message only
+**2 Messages** - Latest 2 messages  
+**5 Messages** - Latest 5 messages
+**10 Messages** - Latest 10 messages ⭐ **Default**
+**20 Messages** - Latest 20 messages
+
+💡 **Tip:** Lower counts are faster, higher counts give broader reach
+            """
+            
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.auto_count_settings(),
+                    parse_mode="Markdown"
+                )
+            await callback_query.answer()
+        
+        # Refresh settings if not delay or auto_count
+        elif data not in ["setting_delay", "setting_auto_count"]:
             await self.show_settings(callback_query)
     
     async def handle_delay_setting(self, callback_query: types.CallbackQuery, data: str):
@@ -909,6 +951,24 @@ Select a channel below to start:
                 "high": "🛡️ Safe Mode activated - Maximum protection!"
             }
             await callback_query.answer(responses.get(delay_level, "✨ Settings updated!"))
+            await self.show_settings(callback_query)
+    
+    async def handle_auto_count_setting(self, callback_query: types.CallbackQuery, data: str):
+        """Handle auto message count setting changes"""
+        user_id = callback_query.from_user.id
+        
+        count_map = {
+            "auto_count_1": 1,
+            "auto_count_2": 2,
+            "auto_count_5": 5,
+            "auto_count_10": 10,
+            "auto_count_20": 20
+        }
+        
+        count = count_map.get(data)
+        if count:
+            await self.update_user_setting(user_id, "auto_message_count", count)
+            await callback_query.answer(f"✨ Auto message count set to {count} messages!")
             await self.show_settings(callback_query)
     
     async def show_channel_info(self, callback_query: types.CallbackQuery, data: str):

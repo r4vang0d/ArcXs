@@ -70,7 +70,8 @@ class Utils:
                     "views_only": False,  # Default: views + read
                     "account_rotation": True,  # Always enabled
                     "delay_level": "medium",
-                    "auto_join": True
+                    "auto_join": True,
+                    "auto_message_count": 10  # Default: boost last 10 messages
                 }
             settings = json.loads(settings_json)
             # Force account rotation to always be True
@@ -82,7 +83,8 @@ class Utils:
                 "views_only": False,
                 "account_rotation": True,  # Always enabled
                 "delay_level": "medium",
-                "auto_join": True
+                "auto_join": True,
+                "auto_message_count": 10  # Default: boost last 10 messages
             }
     
     @staticmethod
@@ -150,8 +152,8 @@ class Utils:
         return text[:max_length-3] + "..."
     
     @staticmethod
-    def extract_message_ids(text: str) -> List[int]:
-        """Extract message IDs from text input"""
+    def extract_message_ids_and_links(text: str) -> List[int]:
+        """Extract message IDs from text input (supports both IDs and message links)"""
         try:
             # Split by comma, space, or newline
             parts = re.split(r'[,\s\n]+', text.strip())
@@ -164,11 +166,42 @@ class Utils:
                     # Handle ranges like "1-5"
                     start, end = map(int, part.split('-'))
                     message_ids.extend(range(start, end + 1))
+                elif 't.me/' in part:
+                    # Handle message links like https://t.me/channel/123
+                    message_id = Utils.extract_message_id_from_link(part)
+                    if message_id:
+                        message_ids.append(message_id)
             
             return list(set(message_ids))  # Remove duplicates
         except Exception as e:
             logger.error(f"Error extracting message IDs from '{text}': {e}")
             return []
+    
+    @staticmethod
+    def extract_message_ids(text: str) -> List[int]:
+        """Extract message IDs from text input (legacy method for compatibility)"""
+        return Utils.extract_message_ids_and_links(text)
+    
+    @staticmethod
+    def extract_message_id_from_link(link: str) -> Optional[int]:
+        """Extract message ID from Telegram message link"""
+        try:
+            # Pattern for message links: https://t.me/channel/messageId
+            patterns = [
+                r't\.me/([^/]+)/(\d+)',  # https://t.me/channel/123
+                r't\.me/c/(\d+)/(\d+)',  # https://t.me/c/1234567890/123 (private channels)
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, link)
+                if match:
+                    # For both patterns, the message ID is the last group
+                    return int(match.groups()[-1])
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting message ID from link '{link}': {e}")
+            return None
     
     @staticmethod
     def safe_int(value: Any, default: int = 0) -> int:
@@ -240,16 +273,16 @@ class Utils:
     @staticmethod
     def validate_message_ids_input(text: str) -> tuple:
         """
-        Validate message IDs input
+        Validate message IDs input (supports both IDs and message links)
         Returns (is_valid, message_ids, error_message)
         """
         if not text.strip():
-            return False, [], "Please enter message IDs"
+            return False, [], "Please enter message IDs or message links"
         
-        message_ids = Utils.extract_message_ids(text)
+        message_ids = Utils.extract_message_ids_and_links(text)
         
         if not message_ids:
-            return False, [], "No valid message IDs found. Use numbers separated by commas or spaces."
+            return False, [], "No valid message IDs found. Use numbers, ranges (1-5), or message links (https://t.me/channel/123)."
         
         if len(message_ids) > 100:
             return False, [], "Too many message IDs. Maximum 100 allowed."

@@ -94,6 +94,7 @@ class BotKeyboards:
         """Settings configuration menu"""
         buttons = [
             [InlineKeyboardButton(text="⚡ Performance Settings", callback_data="setting_delay")],
+            [InlineKeyboardButton(text="📊 Auto Message Count", callback_data="setting_auto_count")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -105,6 +106,19 @@ class BotKeyboards:
             [InlineKeyboardButton(text="🚀 Fast Mode", callback_data="delay_low"),
              InlineKeyboardButton(text="⚡ Balanced", callback_data="delay_medium")],
             [InlineKeyboardButton(text="🛡️ Safe Mode", callback_data="delay_high")],
+            [InlineKeyboardButton(text="🔙 Settings", callback_data="settings")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def auto_count_settings() -> InlineKeyboardMarkup:
+        """Auto message count configuration options"""
+        buttons = [
+            [InlineKeyboardButton(text="1 Message", callback_data="auto_count_1"),
+             InlineKeyboardButton(text="2 Messages", callback_data="auto_count_2")],
+            [InlineKeyboardButton(text="5 Messages", callback_data="auto_count_5"),
+             InlineKeyboardButton(text="10 Messages", callback_data="auto_count_10")],
+            [InlineKeyboardButton(text="20 Messages", callback_data="auto_count_20")],
             [InlineKeyboardButton(text="🔙 Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
