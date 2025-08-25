@@ -18,6 +18,7 @@ from telethon.errors import (
 )
 from telethon.tl.functions.messages import GetMessagesViewsRequest, SendReactionRequest
 from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.functions.phone import JoinGroupCallRequest
 from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser, ReactionEmoji
 
 from database import DatabaseManager, AccountStatus, LogType
@@ -613,11 +614,11 @@ class TelethonManager:
         except Exception as e:
             logger.error(f"Error updating account usernames: {e}")
     
-    async def check_channel_for_live_stream(self, channel_link: str) -> bool:
-        """Check if a channel currently has live streams"""
+    async def check_channel_for_live_stream(self, channel_link: str) -> Tuple[bool, Optional[Dict]]:
+        """Check if a channel currently has live streams and return group call info"""
         if not self.active_clients:
             logger.warning(f"No active clients available to check live stream for {channel_link}")
-            return False
+            return False, None
         
         try:
             client = self.clients[self.active_clients[0]]
@@ -637,7 +638,7 @@ class TelethonManager:
                     message.action and 
                     'video_chat' in str(type(message.action)).lower()):
                     logger.info(f"🔴 Live stream detected via video_chat action in {channel_link}")
-                    return True
+                    return True, None
                 
                 # Check if message text indicates live stream (expanded keywords)
                 if message.text:
@@ -651,13 +652,13 @@ class TelethonManager:
                     for keyword in live_keywords:
                         if keyword in text_lower:
                             logger.info(f"🔴 Live stream detected via keyword '{keyword}' in message: {message.text[:100]}...")
-                            return True
+                            return True, None
                 
                 # Check message media for live stream indicators
                 if message.media:
                     # Check for group call or voice chat media
                     if hasattr(message.media, 'call'):
-                        return True
+                        return True, None
                     
                     # Check for message service actions that indicate live streams
                 if hasattr(message, 'action') and message.action:
@@ -665,14 +666,24 @@ class TelethonManager:
                     action_type = str(message.action)
                     if any(term in action_str for term in ['groupcall', 'videochat', 'call']):
                         logger.info(f"🔴 Live stream detected via action: {action_str} - {action_type}")
-                        return True
+                        
+                        # Extract group call information if available
+                        group_call_info = None
+                        if hasattr(message.action, 'call') and message.action.call:
+                            group_call_info = {
+                                'id': message.action.call.id,
+                                'access_hash': message.action.call.access_hash
+                            }
+                            logger.info(f"📞 Group call info extracted: {group_call_info}")
+                        
+                        return True, group_call_info
             
             logger.debug(f"No live stream detected in {channel_link} after checking {len(messages)} messages")
-            return False
+            return False, None
             
         except Exception as e:
             logger.error(f"Error checking live stream for {channel_link}: {e}")
-            return False
+            return False, None
     
     async def get_channel_info(self, channel_link: str) -> Dict[str, Any]:
         """Get channel information"""
@@ -694,7 +705,7 @@ class TelethonManager:
             logger.error(f"Error getting channel info for {channel_link}: {e}")
             return None
     
-    async def join_live_stream(self, channel_link: str) -> Dict[str, Any]:
+    async def join_live_stream(self, channel_link: str, group_call_info: Optional[Dict] = None) -> Dict[str, Any]:
         """Join live stream with all available accounts"""
         if not self.active_clients:
             return {"success": False, "message": "No active accounts", "accounts_joined": 0}
@@ -708,21 +719,58 @@ class TelethonManager:
                     client = self.clients[session_name]
                     entity = await client.get_entity(channel_link)
                     
-                    # Join the channel if not already joined
+                    # First, ensure we're joined to the channel
                     try:
                         await client(JoinChannelRequest(entity))
-                        accounts_joined += 1
-                        logger.info(f"Account {session_name} joined live stream in {channel_link}")
-                        
-                        # Add small delay between joins
-                        await asyncio.sleep(1)
-                        
-                    except Exception as join_error:
-                        if "already a participant" in str(join_error).lower():
-                            accounts_joined += 1  # Already joined, count as success
-                        else:
+                        logger.info(f"Account {session_name} joined channel {channel_link}")
+                    except Exception as channel_join_error:
+                        if "already a participant" not in str(channel_join_error).lower():
+                            logger.error(f"Failed to join channel with {session_name}: {channel_join_error}")
                             failed_accounts.append(session_name)
-                            logger.error(f"Failed to join live stream with {session_name}: {join_error}")
+                            continue
+                    
+                    # Now try to join the group call if info is available
+                    if group_call_info:
+                        try:
+                            from telethon.tl.types import InputGroupCall
+                            group_call = InputGroupCall(
+                                id=group_call_info['id'],
+                                access_hash=group_call_info['access_hash']
+                            )
+                            
+                            # Try to join the group call
+                            from telethon.tl.types import DataJSON
+                            me = await client.get_me()
+                            
+                            # Create proper params for joining group call
+                            params = DataJSON(data='{"ufrag":"","pwd":""}')  # Basic WebRTC params
+                            
+                            await client(JoinGroupCallRequest(
+                                call=group_call,
+                                join_as=me,     # Join as the user account
+                                muted=True,      # Join muted to avoid audio issues
+                                video_stopped=True,  # Join without video
+                                params=params   # Required WebRTC parameters
+                            ))
+                            accounts_joined += 1
+                            logger.info(f"🎤 Account {session_name} joined GROUP CALL in {channel_link}")
+                        
+                        except Exception as group_call_error:
+                            if "already in groupcall" in str(group_call_error).lower():
+                                accounts_joined += 1  # Already in call, count as success
+                                logger.info(f"Account {session_name} already in group call")
+                            else:
+                                logger.error(f"Failed to join group call with {session_name}: {group_call_error}")
+                                # Still count as joined to channel even if group call fails
+                                accounts_joined += 1
+                                logger.info(f"Account {session_name} joined channel but not group call")
+                    else:
+                        # No group call info, just joined channel
+                        accounts_joined += 1
+                        logger.info(f"Account {session_name} joined channel (no group call info)")
+                        
+                    # Add small delay between joins
+                    await asyncio.sleep(1)
                 
                 except Exception as client_error:
                     failed_accounts.append(session_name)

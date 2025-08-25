@@ -90,13 +90,13 @@ class LiveMonitorService:
             monitor_id = monitor['id']
             
             # Check if channel has live stream
-            has_live = await self.telethon.check_channel_for_live_stream(channel_link)
+            has_live, group_call_info = await self.telethon.check_channel_for_live_stream(channel_link)
             
             if has_live:
                 logger.info(f"🔴 LIVE STREAM DETECTED in {channel_link}!")
                 
                 # Join the live stream with all accounts
-                result = await self.telethon.join_live_stream(channel_link)
+                result = await self.telethon.join_live_stream(channel_link, group_call_info)
                 
                 if result['success']:
                     accounts_joined = result['accounts_joined']
