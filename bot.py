@@ -56,6 +56,10 @@ class ViewBoosterBot:
         # Message handlers for FSM states
         self.dp.message.register(self.handle_phone_input, 
                                lambda message: message.text and not message.text.startswith('/'))
+        
+        # Register admin message handlers
+        self.dp.message.register(self.admin_handler.handle_message,
+                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
         """Handle /start command"""
@@ -179,8 +183,11 @@ class ViewBoosterBot:
         data = callback_query.data
         
         try:
-            # Admin handlers
-            if self.config.is_admin(user_id) and data.startswith(('admin_', 'logs_', 'account_details:', 'add_account', 'remove_account', 'list_accounts', 'refresh_accounts', 'api_default', 'api_custom', 'cancel_operation')):
+            # Admin handlers - expanded to include premium and channel control callbacks
+            admin_prefixes = ('admin_', 'logs_', 'account_details:', 'premium_', 'channel_')
+            admin_exact_matches = ['add_account', 'remove_account', 'list_accounts', 'refresh_accounts', 'api_default', 'api_custom', 'cancel_operation']
+            
+            if self.config.is_admin(user_id) and (data.startswith(admin_prefixes) or data in admin_exact_matches):
                 await self.admin_handler.handle_callback(callback_query, state)
                 return
             
