@@ -62,6 +62,26 @@ class Utils:
         return link
     
     @staticmethod
+    def validate_channel_link(link: str) -> tuple[bool, str, str]:
+        """Validate and normalize channel link"""
+        try:
+            link = link.strip()
+            if not link:
+                return False, "", "Channel link cannot be empty"
+            
+            # Check if valid format
+            if not Utils.is_valid_telegram_link(link):
+                return False, "", "Invalid channel link format. Use @username or https://t.me/username"
+            
+            # Normalize the link
+            normalized_link = Utils.normalize_telegram_link(link)
+            
+            return True, normalized_link, ""
+            
+        except Exception as e:
+            return False, "", f"Error validating link: {str(e)}"
+    
+    @staticmethod
     def parse_user_settings(settings_json: str) -> Dict[str, Any]:
         """Parse user settings from JSON string"""
         try:
