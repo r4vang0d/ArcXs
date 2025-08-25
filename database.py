@@ -168,12 +168,21 @@ class DatabaseManager:
     
     # User management
     async def add_user(self, user_id: int, premium: bool = False, expiry: Optional[datetime] = None) -> bool:
-        """Add or update a user"""
+        """Add or update a user (preserves existing settings)"""
         try:
-            await self._execute_with_lock("""
-                INSERT OR REPLACE INTO users (id, premium, expiry)
-                VALUES (?, ?, ?)
-            """, (user_id, premium, expiry))
+            # Check if user exists first
+            existing_user = await self.get_user(user_id)
+            if existing_user:
+                # User exists, only update premium and expiry, preserve settings
+                await self._execute_with_lock("""
+                    UPDATE users SET premium = ?, expiry = ? WHERE id = ?
+                """, (premium, expiry, user_id))
+            else:
+                # New user, insert with default settings
+                await self._execute_with_lock("""
+                    INSERT INTO users (id, premium, expiry, settings)
+                    VALUES (?, ?, ?, '{}')
+                """, (user_id, premium, expiry))
             await self._commit_with_lock()
             return True
         except Exception as e:
