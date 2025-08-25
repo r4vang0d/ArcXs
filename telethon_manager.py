@@ -350,8 +350,12 @@ class TelethonManager:
                 ))
                 
                 if mark_as_read:
-                    # Mark messages as read
-                    await client.send_read_acknowledge(entity, message_ids)
+                    # Mark messages as read - handle each message ID individually
+                    try:
+                        for msg_id in message_ids:
+                            await client.send_read_acknowledge(entity, msg_id)
+                    except Exception as read_error:
+                        logger.warning(f"Could not mark messages as read: {read_error}")
                 
                 # Count successful views
                 if hasattr(result, 'views') and result.views:
