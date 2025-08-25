@@ -216,7 +216,7 @@ class DatabaseManager:
         return True
     
     # Account management
-    async def add_account(self, phone: str, session_name: str, username: str = None) -> bool:
+    async def add_account(self, phone: str, session_name: str, username: Optional[str] = None) -> bool:
         """Add a new Telethon account"""
         try:
             await self._execute_with_lock("""
@@ -476,7 +476,7 @@ class DatabaseManager:
     
     # === Channel Control Methods ===
     
-    async def add_channel_to_whitelist(self, channel_link: str, admin_id: int, reason: str = None):
+    async def add_channel_to_whitelist(self, channel_link: str, admin_id: int, reason: Optional[str] = None):
         """Add channel to whitelist"""
         async with self._operation_lock:
             connection = await self._ensure_connection()
@@ -488,7 +488,7 @@ class DatabaseManager:
             await connection.commit()
             logger.info(f"Channel {channel_link} whitelisted by admin {admin_id}")
     
-    async def add_channel_to_blacklist(self, channel_link: str, admin_id: int, reason: str = None):
+    async def add_channel_to_blacklist(self, channel_link: str, admin_id: int, reason: Optional[str] = None):
         """Add channel to blacklist"""
         async with self._operation_lock:
             connection = await self._ensure_connection()

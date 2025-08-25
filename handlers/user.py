@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Optional
 
-from aiogram import types
+from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -30,7 +30,7 @@ class UserHandler:
         self.config = config
         self.db = db_manager
         self.telethon = telethon_manager
-        self.bot = None  # Will be set by the main bot class
+        self.bot: Optional[Bot] = None  # Will be set by the main bot class
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle user callback queries"""

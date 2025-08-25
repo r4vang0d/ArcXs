@@ -34,20 +34,17 @@ class TelethonManager:
         self.active_clients: List[str] = []
         self._client_lock = asyncio.Lock()
     
-    async def add_account_interactive(self, phone: str, api_id: int = None, api_hash: str = None) -> Tuple[bool, str]:
-        """
-        DEPRECATED: Use start_account_verification instead
-        """
-        return False, "Use start_account_verification and complete_account_verification instead"
     
-    async def start_account_verification(self, phone: str, api_id: int = None, api_hash: str = None) -> Tuple[bool, str, any]:
+    async def start_account_verification(self, phone: str, api_id: Optional[int] = None, api_hash: Optional[str] = None) -> Tuple[bool, str, Optional[dict]]:
         """
         Start account verification process and request code
         Returns (success, message, verification_data)
         """
         # Use provided credentials or fall back to defaults
-        api_id = api_id or self.config.DEFAULT_API_ID
-        api_hash = api_hash or self.config.DEFAULT_API_HASH
+        if api_id is None:
+            api_id = self.config.DEFAULT_API_ID
+        if api_hash is None:
+            api_hash = self.config.DEFAULT_API_HASH
         
         session_name = f"session_{phone.replace('+', '').replace('-', '').replace(' ', '')}"
         session_path = os.path.join(self.config.SESSION_DIR, session_name)
@@ -133,7 +130,10 @@ class TelethonManager:
             return False, f"❌ Flood wait error: try again in {e.seconds} seconds"
         except Exception as e:
             logger.error(f"Error completing verification for {phone}: {e}")
-            await verification_data['client'].disconnect()
+            try:
+                await verification_data['client'].disconnect()
+            except Exception:
+                pass  # Ignore disconnect errors during error handling
             return False, f"❌ Error: {str(e)}"
     
     async def remove_account(self, phone: str) -> Tuple[bool, str]:
@@ -189,7 +189,7 @@ class TelethonManager:
                 
                 if os.path.exists(session_path + ".session"):
                     try:
-                        client = TelegramClient(session_path, self.config.API_ID, self.config.API_HASH)
+                        client = TelegramClient(session_path, int(self.config.API_ID), self.config.API_HASH)
                         await client.start()
                         
                         if await client.is_user_authorized():
@@ -284,7 +284,8 @@ class TelethonManager:
                     channel_id = str(entity.id)
                     title = getattr(entity, 'title', channel_link)
                     return True, f"✅ Already joined {title}", channel_id
-                except:
+                except Exception as e:
+                    logger.warning(f"Could not get entity info: {e}")
                     return True, f"✅ Already joined channel", None
                 
             except FloodWaitError as e:
@@ -347,17 +348,22 @@ class TelethonManager:
                 # Get channel entity
                 entity = await client.get_entity(channel_link)
                 
-                # Boost views
-                result = await client(GetMessagesViewsRequest(
-                    peer=entity,
-                    id=message_ids,
-                    increment=True
-                ))
+                # Boost views with better error handling
+                try:
+                    result = await client(GetMessagesViewsRequest(
+                        peer=entity,
+                        id=message_ids,
+                        increment=True
+                    ))
+                except Exception as boost_error:
+                    logger.warning(f"Boost request failed: {boost_error}")
+                    continue
                 
                 if mark_as_read:
                     # Mark messages as read using proper method
                     try:
-                        await client.send_read_acknowledge(entity.id, max_id=max(message_ids))
+                        if hasattr(entity, 'id'):
+                            await client.send_read_acknowledge(entity.id, max_id=max(message_ids))
                     except Exception as read_error:
                         logger.warning(f"Could not mark messages as read: {read_error}")
                 
@@ -413,7 +419,9 @@ class TelethonManager:
         try:
             entity = await client.get_entity(channel_link)
             messages = await client.get_messages(entity, limit=limit)
-            return [msg.id for msg in messages if msg.id]
+            if messages:
+                return [msg.id for msg in messages if hasattr(msg, 'id') and msg.id]
+            return []
         except Exception as e:
             logger.error(f"Error getting messages from {channel_link}: {e}")
             return []
@@ -457,7 +465,12 @@ class TelethonManager:
                         client = self.clients[account['session_name']]
                         if await client.is_user_authorized():
                             me = await client.get_me()
-                            username = me.username if hasattr(me, 'username') and me.username else me.first_name
+                            if hasattr(me, 'username') and me.username:
+                                username = me.username
+                            elif hasattr(me, 'first_name') and me.first_name:
+                                username = me.first_name
+                            else:
+                                username = account['phone']
                             
                             # Update the database with the username
                             await self.db._execute_with_lock("""
@@ -476,7 +489,8 @@ class TelethonManager:
         """Cleanup all clients on shutdown"""
         for client in self.clients.values():
             try:
-                await client.disconnect()
+                if client.is_connected():
+                    await client.disconnect()
             except Exception as e:
                 logger.error(f"Error disconnecting client: {e}")
         

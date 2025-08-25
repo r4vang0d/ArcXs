@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from aiogram import types
+from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -26,7 +26,6 @@ class AdminStates(StatesGroup):
     waiting_for_custom_api_id = State()
     waiting_for_custom_api_hash = State()
     waiting_for_verification_code = State()
-    # Premium states removed for personal use
     waiting_for_channel_link = State()
     waiting_for_channel_reason = State()
     waiting_for_remove_channel = State()
@@ -38,7 +37,7 @@ class AdminHandler:
         self.config = config
         self.db = db_manager
         self.telethon = telethon_manager
-        self.bot = None  # Will be set by the main bot class
+        self.bot: Optional[Bot] = None  # Will be set by the main bot class
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle admin callback queries"""
@@ -48,7 +47,7 @@ class AdminHandler:
         
         data = callback_query.data
         
-        # Admin panel removed for personal use - redirects to main menu
+        # Admin account management
         if data == "admin_accounts":
             await self.show_account_management(callback_query)
         elif data == "admin_logs":

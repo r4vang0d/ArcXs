@@ -57,16 +57,12 @@ class ViewBoosterBot:
         # Callback handlers
         self.dp.callback_query.register(self.handle_callback)
         
-        # Message handlers for FSM states
+        # Message handlers for FSM states and admin/user input
         self.dp.message.register(self.handle_phone_input, 
                                lambda message: message.text and not message.text.startswith('/'))
         
-        # Register admin message handlers
+        # Admin message handlers
         self.dp.message.register(self.admin_handler.handle_message,
-                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
-        
-        # Register user message handlers  
-        self.dp.message.register(self.user_handler.handle_message,
                                lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
@@ -245,11 +241,8 @@ class ViewBoosterBot:
             await self.admin_handler.handle_message(message, state)
             return
         
-        # Handle user input (admin-only mode)
-        if self.config.is_admin(user_id):
-            await self.user_handler.handle_message(message, state)
-        else:
-            await message.answer("❌ Access denied. Personal use only.")
+        # Handle user input for personal use
+        await self.user_handler.handle_message(message, state)
     
     async def start(self):
         """Start the bot"""

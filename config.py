@@ -2,8 +2,11 @@
 Configuration management using environment variables
 """
 import os
+import logging
 from typing import List
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables (optional for .env file)
 load_dotenv('.env', verbose=True)
@@ -27,7 +30,8 @@ class Config:
         
         try:
             self.API_ID = int(self.API_ID)
-        except ValueError:
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid API_ID format, using default: {self.DEFAULT_API_ID}")
             self.API_ID = self.DEFAULT_API_ID
         
         # Admin Configuration
@@ -46,9 +50,14 @@ class Config:
         self.DATABASE_PATH = os.getenv("DATABASE_PATH", "bot_data.db")
         
         # Bot Configuration
-        self.DEFAULT_DELAY_MIN = int(os.getenv("DEFAULT_DELAY_MIN", "1"))
-        self.DEFAULT_DELAY_MAX = int(os.getenv("DEFAULT_DELAY_MAX", "5"))
-        self.MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "3"))
+        try:
+            self.DEFAULT_DELAY_MIN = int(os.getenv("DEFAULT_DELAY_MIN", "1"))
+            self.DEFAULT_DELAY_MAX = int(os.getenv("DEFAULT_DELAY_MAX", "5"))
+            self.MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "3"))
+        except (ValueError, TypeError):
+            self.DEFAULT_DELAY_MIN = 1
+            self.DEFAULT_DELAY_MAX = 5
+            self.MAX_RETRY_ATTEMPTS = 3
         self.SESSION_DIR = os.getenv("SESSION_DIR", "sessions")
         
         # Create session directory if it doesn't exist

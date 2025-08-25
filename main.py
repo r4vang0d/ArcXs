@@ -42,9 +42,17 @@ async def main():
         bot = ViewBoosterBot(config, db_manager)
         await bot.start()
         
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+        sys.exit(0)
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
         sys.exit(1)
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}", exc_info=True)
+        sys.exit(1)
+    finally:
+        logger.info("Bot shutdown complete")
 
 if __name__ == "__main__":
     # Run the bot

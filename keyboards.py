@@ -23,12 +23,6 @@ class BotKeyboards:
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
-    # personal_main_menu() removed - using main_menu() instead
-    
-    # user_panel() removed - using main_menu() instead
-    
-    # admin_panel() removed - using main_menu() instead
-    
     @staticmethod
     def account_management() -> InlineKeyboardMarkup:
         """Account management keyboard"""
@@ -40,8 +34,6 @@ class BotKeyboards:
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
-    
-    # premium_management() removed - not needed for personal use
     
     @staticmethod
     def channel_control() -> InlineKeyboardMarkup:
