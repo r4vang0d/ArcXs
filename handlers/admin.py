@@ -37,6 +37,10 @@ class AdminHandler:
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle admin callback queries"""
+        if not callback_query.from_user or not callback_query.data:
+            await callback_query.answer("Invalid request", show_alert=True)
+            return
+        
         data = callback_query.data
         
         if data == "admin_panel":
@@ -108,11 +112,12 @@ class AdminHandler:
 Choose an action below:
         """
         
-        await callback_query.message.edit_text(
-            admin_text,
-            reply_markup=BotKeyboards.admin_panel(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                admin_text,
+                reply_markup=BotKeyboards.admin_panel(),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_account_management(self, callback_query: types.CallbackQuery):
@@ -131,11 +136,12 @@ Quick Actions:
 • Refresh Status - Update account health
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.account_management(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.account_management(),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def start_add_account(self, callback_query: types.CallbackQuery, state: FSMContext):
@@ -164,16 +170,19 @@ Choose your preferred method:
             [types.InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_operation")]
         ]
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons),
+                parse_mode="Markdown"
+            )
         await state.set_state(AdminStates.waiting_for_api_choice)
         await callback_query.answer()
     
     async def process_add_account(self, message: types.Message, state: FSMContext):
         """Process add account with phone number - start verification"""
+        if not message.text:
+            return
         phone = message.text.strip()
         
         if phone == "/cancel":
@@ -243,6 +252,8 @@ Send the code or /cancel to abort.
     
     async def process_verification_code(self, message: types.Message, state: FSMContext):
         """Process verification code input"""
+        if not message.text:
+            return
         code = message.text.strip()
         
         if code == "/cancel":
@@ -330,11 +341,12 @@ Please send the phone number for the new account.
 Send the phone number or /cancel to abort.
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.cancel_operation(),
+                parse_mode="Markdown"
+            )
         await state.set_state(AdminStates.waiting_for_phone)
         await callback_query.answer()
     
@@ -366,16 +378,19 @@ Example: 12345678
 Or /cancel to abort.
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.cancel_operation(),
+                parse_mode="Markdown"
+            )
         await state.set_state(AdminStates.waiting_for_custom_api_id)
         await callback_query.answer()
     
     async def process_custom_api_id(self, message: types.Message, state: FSMContext):
         """Process custom API ID input"""
+        if not message.text:
+            return
         api_id_text = message.text.strip()
         
         if api_id_text == "/cancel":
@@ -411,6 +426,8 @@ Send your API Hash or /cancel to abort.
     
     async def process_custom_api_hash(self, message: types.Message, state: FSMContext):
         """Process custom API Hash input"""
+        if not message.text:
+            return
         api_hash = message.text.strip()
         
         if api_hash == "/cancel":
@@ -491,16 +508,19 @@ Please send the phone number of the account to remove:
 Send the phone number or /cancel to abort.
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.cancel_operation(),
+                parse_mode="Markdown"
+            )
         await state.set_state(AdminStates.waiting_for_remove_phone)
         await callback_query.answer()
     
     async def process_remove_account(self, message: types.Message, state: FSMContext):
         """Process remove account"""
+        if not message.text:
+            return
         phone = message.text.strip()
         
         if phone == "/cancel":

@@ -26,7 +26,9 @@ class ViewBoosterBot:
         self.config = config
         self.db = db_manager
         
-        # Initialize Aiogram bot
+        # Initialize Aiogram bot with proper token validation
+        if not config.BOT_TOKEN:
+            raise ValueError("BOT_TOKEN is required")
         self.bot = Bot(token=config.BOT_TOKEN)
         self.dp = Dispatcher(storage=MemoryStorage())
         
@@ -57,6 +59,8 @@ class ViewBoosterBot:
     
     async def start_command(self, message: types.Message):
         """Handle /start command"""
+        if not message.from_user:
+            return
         user_id = message.from_user.id
         
         # Add user to database if not exists
@@ -69,7 +73,7 @@ class ViewBoosterBot:
 🎯 **Welcome to View Booster Bot!**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-👋 Hello **{message.from_user.first_name}**! 
+👋 Hello **{message.from_user.first_name or 'User'}**! 
 
 🚀 This bot helps you manage Telegram channels and boost views using multiple accounts with advanced automation.
 
@@ -131,6 +135,8 @@ class ViewBoosterBot:
     
     async def stats_command(self, message: types.Message):
         """Handle /stats command"""
+        if not message.from_user:
+            return
         user_id = message.from_user.id
         
         # Get user statistics
@@ -165,8 +171,12 @@ class ViewBoosterBot:
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle all callback queries"""
-        user_id = callback_query.from_user.id if callback_query.from_user else 0
-        data = callback_query.data or ''
+        if not callback_query.from_user or not callback_query.data:
+            await callback_query.answer("Invalid request", show_alert=True)
+            return
+        
+        user_id = callback_query.from_user.id
+        data = callback_query.data
         
         try:
             # Admin handlers
@@ -183,6 +193,8 @@ class ViewBoosterBot:
     
     async def handle_phone_input(self, message: types.Message, state: FSMContext):
         """Handle text input (for FSM states)"""
+        if not message.from_user:
+            return
         user_id = message.from_user.id
         
         # Check if this is admin input

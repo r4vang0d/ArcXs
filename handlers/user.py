@@ -33,6 +33,10 @@ class UserHandler:
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle user callback queries"""
+        if not callback_query.from_user or not callback_query.data:
+            await callback_query.answer("Invalid request", show_alert=True)
+            return
+        
         data = callback_query.data
         user_id = callback_query.from_user.id
         
@@ -94,11 +98,12 @@ Welcome back, {callback_query.from_user.first_name}!
 {'Choose your panel:' if is_admin else 'What would you like to do?'}
         """
         
-        await callback_query.message.edit_text(
-            welcome_text,
-            reply_markup=BotKeyboards.main_menu(is_admin),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                welcome_text,
+                reply_markup=BotKeyboards.main_menu(is_admin),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_user_panel(self, callback_query: types.CallbackQuery):
@@ -121,11 +126,12 @@ Total Boosts: {total_boosts:,}
 What would you like to do?
         """
         
-        await callback_query.message.edit_text(
-            panel_text,
-            reply_markup=BotKeyboards.user_panel(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                panel_text,
+                reply_markup=BotKeyboards.user_panel(),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def start_add_channel(self, callback_query: types.CallbackQuery, state: FSMContext):
@@ -162,16 +168,19 @@ Send the channel link or username:
 Send the channel link or /cancel to abort.
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.cancel_operation(),
+                parse_mode="Markdown"
+            )
         await state.set_state(UserStates.waiting_for_channel)
         await callback_query.answer()
     
     async def process_add_channel(self, message: types.Message, state: FSMContext):
         """Process add channel with link"""
+        if not message.from_user or not message.text:
+            return
         user_id = message.from_user.id
         channel_link = message.text.strip()
         
@@ -263,11 +272,12 @@ Send the channel link or /cancel to abort.
                 text += f"   ⚡ Boosts: {boosts}\n"
                 text += f"   📅 Last: {last_boosted}\n\n"
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.channel_list(channels, user_id),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.channel_list(channels, user_id),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_my_stats(self, callback_query: types.CallbackQuery):
@@ -312,11 +322,12 @@ Total Boosts: {total_boosts:,}
                 boosts = channel.get("total_boosts", 0)
                 stats_text += f"• {name}: {boosts} boosts\n"
         
-        await callback_query.message.edit_text(
-            stats_text,
-            reply_markup=BotKeyboards.back_button("user_panel"),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                stats_text,
+                reply_markup=BotKeyboards.back_button("user_panel"),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_boost_menu(self, callback_query: types.CallbackQuery):
@@ -359,11 +370,12 @@ Choose a channel below:
         
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def start_instant_boost(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
@@ -405,11 +417,12 @@ Account Rotation: {'✅' if await self.get_user_setting(user_id, 'account_rotati
 Send message IDs or "auto", or /cancel to abort.
             """
             
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.cancel_operation(),
-                parse_mode="Markdown"
-            )
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
             await state.set_state(UserStates.waiting_for_message_ids)
             await callback_query.answer()
             
@@ -419,6 +432,8 @@ Send message IDs or "auto", or /cancel to abort.
     
     async def process_boost_messages(self, message: types.Message, state: FSMContext):
         """Process boost with message IDs"""
+        if not message.from_user or not message.text:
+            return
         user_id = message.from_user.id
         input_text = message.text.strip()
         
@@ -526,11 +541,12 @@ Currently: {delay_level.title()} ({dict(Utils.get_delay_range(delay_level))[0]}-
 Choose a setting to modify:
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.settings_menu(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.settings_menu(),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def handle_setting(self, callback_query: types.CallbackQuery, data: str):
@@ -560,11 +576,12 @@ Choose delay between account operations:
 Current setting will be highlighted.
             """
             
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.delay_settings(),
-                parse_mode="Markdown"
-            )
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.delay_settings(),
+                    parse_mode="Markdown"
+                )
             await callback_query.answer()
         
         # Refresh settings if not delay
@@ -728,11 +745,12 @@ Last Boosted: {last_boosted}
             else:
                 text += "No recent boost activity"
             
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.back_button(f"channel_info:{channel_id}"),
-                parse_mode="Markdown"
-            )
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.back_button(f"channel_info:{channel_id}"),
+                    parse_mode="Markdown"
+                )
             await callback_query.answer()
             
         except Exception as e:
@@ -765,13 +783,12 @@ Last Boosted: {last_boosted}
             settings[setting_name] = value
             
             # Update in database
-            async with await self.db.get_connection() as db:
-                await db.execute(
-                    "UPDATE users SET settings = ? WHERE id = ?",
-                    (Utils.serialize_user_settings(settings), user_id)
-                )
-                await db.commit()
-                return True
+            await self.db._execute_with_lock(
+                "UPDATE users SET settings = ? WHERE id = ?",
+                (Utils.serialize_user_settings(settings), user_id)
+            )
+            await self.db._commit_with_lock()
+            return True
                 
         except Exception as e:
             logger.error(f"Error updating user setting: {e}")
