@@ -337,8 +337,9 @@ class TelethonManager:
         successful_accounts = 0
         used_accounts = []
         
-        # Use ALL available accounts for maximum boost effect
-        for session_name in list(self.active_clients.keys()):
+        # Use ALL available accounts for maximum boost effect  
+        available_sessions = list(self.active_clients.keys())
+        for session_name in available_sessions:
             if session_name in used_accounts:
                 continue
                 
