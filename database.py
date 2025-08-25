@@ -29,6 +29,7 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = "bot_data.db"):
         self.db_path = db_path
+        self._connection_lock = asyncio.Lock()
     
     async def init_db(self):
         """Initialize database with required tables"""
@@ -101,13 +102,14 @@ class DatabaseManager:
             logger.info("Database initialized successfully")
     
     async def get_connection(self):
-        """Get a fresh database connection for each operation"""
-        connection = await aiosqlite.connect(self.db_path)
-        await connection.execute("PRAGMA journal_mode=WAL")
-        await connection.execute("PRAGMA synchronous=NORMAL") 
-        await connection.execute("PRAGMA cache_size=1000")
-        await connection.execute("PRAGMA temp_store=MEMORY")
-        return connection
+        """Get a database connection with proper locking"""
+        async with self._connection_lock:
+            connection = await aiosqlite.connect(self.db_path)
+            await connection.execute("PRAGMA journal_mode=WAL")
+            await connection.execute("PRAGMA synchronous=NORMAL") 
+            await connection.execute("PRAGMA cache_size=1000")
+            await connection.execute("PRAGMA temp_store=MEMORY")
+            return connection
     
     # User management
     async def add_user(self, user_id: int, premium: bool = False, expiry: Optional[datetime] = None) -> bool:
@@ -275,7 +277,7 @@ class DatabaseManager:
             return False
     
     # Channel management
-    async def add_channel(self, user_id: int, channel_link: str, channel_id: str = None, title: str = None) -> bool:
+    async def add_channel(self, user_id: int, channel_link: str, channel_id: Optional[str] = None, title: Optional[str] = None) -> bool:
         """Add a channel for a user"""
         try:
             async with await self.get_connection() as db:
@@ -347,8 +349,8 @@ class DatabaseManager:
             return False
     
     # Logging
-    async def log_action(self, log_type: LogType, account_id: int = None, 
-                        channel_id: int = None, user_id: int = None, message: str = None) -> bool:
+    async def log_action(self, log_type: LogType, account_id: Optional[int] = None, 
+                        channel_id: Optional[int] = None, user_id: Optional[int] = None, message: Optional[str] = None) -> bool:
         """Log an action to the database"""
         try:
             async with await self.get_connection() as db:
@@ -362,7 +364,7 @@ class DatabaseManager:
             logger.error(f"Error logging action: {e}")
             return False
     
-    async def get_logs(self, limit: int = 100, log_type: LogType = None) -> List[Dict[str, Any]]:
+    async def get_logs(self, limit: int = 100, log_type: Optional[LogType] = None) -> List[Dict[str, Any]]:
         """Get recent logs"""
         try:
             query = """
