@@ -38,6 +38,7 @@ class AdminHandler:
         self.config = config
         self.db = db_manager
         self.telethon = telethon_manager
+        self.bot = None  # Will be set by the main bot class
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle admin callback queries"""

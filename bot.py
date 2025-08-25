@@ -39,6 +39,10 @@ class ViewBoosterBot:
         self.admin_handler = AdminHandler(config, db_manager, self.telethon_manager)
         self.user_handler = UserHandler(config, db_manager, self.telethon_manager)
         
+        # Pass bot instance to handlers
+        self.admin_handler.bot = self.bot
+        self.user_handler.bot = self.bot
+        
         # Register handlers
         self._register_handlers()
     

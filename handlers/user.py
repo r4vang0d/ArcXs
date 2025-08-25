@@ -30,6 +30,7 @@ class UserHandler:
         self.config = config
         self.db = db_manager
         self.telethon = telethon_manager
+        self.bot = None  # Will be set by the main bot class
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle user callback queries"""
@@ -103,12 +104,23 @@ class UserHandler:
 {'🛠 **Administrator Access** - Choose your management panel:' if is_admin else '⚡ **Ready to boost your content?** - Select an option below:'}
         """
         
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                welcome_text,
-                reply_markup=BotKeyboards.main_menu(is_admin),
-                parse_mode="Markdown"
-            )
+        try:
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    welcome_text,
+                    reply_markup=BotKeyboards.main_menu(is_admin),
+                    parse_mode="Markdown"
+                )
+            else:
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    welcome_text,
+                    reply_markup=BotKeyboards.main_menu(is_admin),
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Error editing main menu: {e}")
+            await callback_query.answer("Menu updated!", show_alert=False)
         await callback_query.answer()
     
     async def show_personal_dashboard(self, callback_query: types.CallbackQuery):
@@ -131,12 +143,23 @@ class UserHandler:
 🚀 **Choose your next action below:**
         """
         
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                panel_text,
-                reply_markup=BotKeyboards.main_menu(True),
-                parse_mode="Markdown"
-            )
+        try:
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    panel_text,
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+            else:
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    panel_text,
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Error editing dashboard: {e}")
+            await callback_query.answer("Dashboard updated!", show_alert=False)
         await callback_query.answer()
     
     async def start_add_channel(self, callback_query: types.CallbackQuery, state: FSMContext):
@@ -167,12 +190,23 @@ class UserHandler:
 💬 **Send your channel link or type /cancel to exit**
         """
         
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.cancel_operation(),
-                parse_mode="Markdown"
-            )
+        try:
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
+            else:
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Error starting add channel: {e}")
+            await callback_query.answer("Add channel started!", show_alert=False)
         await state.set_state(UserStates.waiting_for_channel)
         await callback_query.answer()
     
@@ -271,12 +305,23 @@ class UserHandler:
                 text += f"   ⚡ Boosts: {boosts}\n"
                 text += f"   📅 Last: {last_boosted}\n\n"
         
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.channel_list(channels, user_id),
-                parse_mode="Markdown"
-            )
+        try:
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.channel_list(channels, user_id),
+                    parse_mode="Markdown"
+                )
+            else:
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    text,
+                    reply_markup=BotKeyboards.channel_list(channels, user_id),
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Error showing channels: {e}")
+            await callback_query.answer("Channels updated!", show_alert=False)
         await callback_query.answer()
     
     async def show_my_stats(self, callback_query: types.CallbackQuery):
@@ -368,12 +413,23 @@ Choose a channel below:
         
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
         
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=keyboard,
-                parse_mode="Markdown"
-            )
+        try:
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+            else:
+                await self.bot.send_message(
+                    callback_query.from_user.id,
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Error showing boost menu: {e}")
+            await callback_query.answer("Boost menu updated!", show_alert=False)
         await callback_query.answer()
     
     async def start_instant_boost(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
