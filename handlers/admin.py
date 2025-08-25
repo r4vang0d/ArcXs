@@ -626,10 +626,13 @@ Choose log type to view:
         log_type = log_type_map.get(data)
         logs = await self.db.get_logs(limit=20, log_type=log_type)
         
+        # Format title properly
+        log_title = data.replace('logs_', '').replace('_', ' ').title()
+        
         if not logs:
-            text = f"📊 **{data.replace('logs_', '').title()} Logs**\n\n❌ No logs found."
+            text = f"📊 **{log_title} Logs**\n\n❌ No logs found."
         else:
-            text = f"📊 **{data.replace('logs_', '').title()} Logs** (Last 20)\n\n"
+            text = f"📊 **{log_title} Logs** (Last 20)\n\n"
             
             for log in logs:
                 timestamp = Utils.format_datetime(log["created_at"])
