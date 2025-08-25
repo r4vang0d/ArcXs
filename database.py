@@ -29,7 +29,6 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = "bot_data.db"):
         self.db_path = db_path
-        self._lock = asyncio.Lock()
     
     async def init_db(self):
         """Initialize database with required tables"""
@@ -102,8 +101,13 @@ class DatabaseManager:
             logger.info("Database initialized successfully")
     
     async def get_connection(self):
-        """Get a database connection"""
-        return await aiosqlite.connect(self.db_path)
+        """Get a fresh database connection for each operation"""
+        connection = await aiosqlite.connect(self.db_path)
+        await connection.execute("PRAGMA journal_mode=WAL")
+        await connection.execute("PRAGMA synchronous=NORMAL") 
+        await connection.execute("PRAGMA cache_size=1000")
+        await connection.execute("PRAGMA temp_store=MEMORY")
+        return connection
     
     # User management
     async def add_user(self, user_id: int, premium: bool = False, expiry: Optional[datetime] = None) -> bool:
