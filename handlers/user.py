@@ -851,18 +851,17 @@ Select a channel below to start:
                         parse_mode="Markdown"
                     )
                 except Exception as e:
-                    if "message is not modified" not in str(e):
+                    if "message is not modified" in str(e):
+                        # Silently ignore this harmless error
+                        pass
+                    else:
                         logger.error(f"Error editing settings message: {e}")
                         raise e
             await callback_query.answer()
             
         except Exception as e:
-            # Handle "message not modified" error silently (it's harmless)
-            if "message is not modified" in str(e):
-                await callback_query.answer()
-            else:
-                logger.error(f"Error showing settings: {e}")
-                await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
+            logger.error(f"Error showing settings: {e}")
+            await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
     
     async def handle_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle setting changes"""
