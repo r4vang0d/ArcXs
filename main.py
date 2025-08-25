@@ -16,14 +16,34 @@ from telegram_bot import ViewBoosterBot
 from config import Config
 from database import DatabaseManager
 
-# Configure logging
+# Configure logging with Windows Unicode support
+import platform
+
+# Create handlers with proper encoding
+log_handlers = []
+
+# File handler with UTF-8 encoding
+log_handlers.append(logging.FileHandler('bot.log', encoding='utf-8'))
+
+# Console handler with proper encoding for Windows
+if platform.system() == 'Windows':
+    # Use UTF-8 encoding for Windows console
+    console_handler = logging.StreamHandler(sys.stdout)
+    try:
+        # Try to set UTF-8 encoding (Python 3.7+)
+        console_handler.stream.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        # Fallback for older Python versions
+        pass
+    log_handlers.append(console_handler)
+else:
+    # Standard handler for Linux/Mac
+    log_handlers.append(logging.StreamHandler(sys.stdout))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('bot.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=log_handlers
 )
 
 logger = logging.getLogger(__name__)
