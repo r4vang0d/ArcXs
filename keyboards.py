@@ -10,23 +10,19 @@ class BotKeyboards:
     
     @staticmethod
     def main_menu(is_admin: bool = False) -> InlineKeyboardMarkup:
-        """Main menu keyboard based on user role"""
-        buttons = []
-        
+        """Main menu keyboard - Personal use only"""
         if is_admin:
-            buttons = [
-                [InlineKeyboardButton(text="👤 User Panel", callback_data="user_panel")],
-                [InlineKeyboardButton(text="🛠 Admin Panel", callback_data="admin_panel")],
-            ]
+            # For personal admin use, show unified interface
+            return BotKeyboards.personal_main_menu()
         else:
+            # Non-admin users are blocked, but keep basic structure
             buttons = [
                 [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
                  InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views")],
                 [InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats"),
                  InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
             ]
-        
-        return InlineKeyboardMarkup(inline_keyboard=buttons)
+            return InlineKeyboardMarkup(inline_keyboard=buttons)
     
     @staticmethod
     def personal_main_menu() -> InlineKeyboardMarkup:
