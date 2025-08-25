@@ -228,7 +228,14 @@ class Utils:
             except:
                 pass
         
-        return f"{emoji} {phone} - {description}"
+        # Prefer username over phone for display
+        username = account.get("username")
+        if username:
+            display_name = f"@{username}" if not username.startswith('@') else username
+        else:
+            display_name = phone
+        
+        return f"{emoji} {display_name} - {description}"
     
     @staticmethod
     def validate_message_ids_input(text: str) -> tuple:

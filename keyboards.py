@@ -143,9 +143,15 @@ class BotKeyboards:
             emoji = status_emoji.get(account["status"], "❓")
             phone = account["phone"]
             
+            username = account.get("username")
+            if username:
+                display_name = f"@{username}" if not username.startswith('@') else username
+            else:
+                display_name = account.get("phone", "Unknown")
+            
             buttons.append([
                 InlineKeyboardButton(
-                    text=f"{emoji} {phone}",
+                    text=f"{emoji} {display_name}",
                     callback_data=f"account_details:{account['id']}"
                 )
             ])

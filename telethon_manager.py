@@ -96,20 +96,22 @@ class TelethonManager:
             if user and await client.is_user_authorized():
                 # Get user info
                 me = await client.get_me()
-                logger.info(f"Successfully logged in as {me.first_name} ({phone})")
+                username = me.username if hasattr(me, 'username') and me.username else me.first_name
+                display_name = f"@{username}" if me.username else me.first_name
+                logger.info(f"Successfully logged in as {display_name} ({phone})")
                 
                 # Store client reference
                 self.clients[session_name] = client
                 self.active_clients.append(session_name)
                 
-                # Save to database
-                success = await self.db.add_account(phone, session_name)
+                # Save to database with username
+                success = await self.db.add_account(phone, session_name, username)
                 if success:
                     await self.db.log_action(
                         LogType.JOIN,
-                        message=f"Account {phone} ({me.first_name}) added successfully"
+                        message=f"Account {display_name} added successfully"
                     )
-                    return True, f"✅ Account {phone} ({me.first_name}) added successfully!"
+                    return True, f"✅ Account {display_name} added successfully!"
                 else:
                     await client.disconnect()
                     return False, "❌ Failed to save account to database"

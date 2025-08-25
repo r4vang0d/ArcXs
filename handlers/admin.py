@@ -485,7 +485,7 @@ Send the phone number or /cancel to abort.
             return
         
         account_list = "\n".join([
-            f"📱 {account['phone']} ({account['status']})"
+            f"📱 {account.get('username', account['phone'])} ({account['status']})"
             for account in accounts
         ])
         

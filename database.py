@@ -51,6 +51,7 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS accounts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     phone TEXT UNIQUE NOT NULL,
+                    username TEXT,
                     session_name TEXT UNIQUE NOT NULL,
                     status TEXT DEFAULT 'active',
                     flood_wait_until DATETIME,
@@ -59,6 +60,13 @@ class DatabaseManager:
                     failed_attempts INTEGER DEFAULT 0
                 )
             """)
+            
+            # Add username column if it doesn't exist
+            try:
+                await db.execute("ALTER TABLE accounts ADD COLUMN username TEXT")
+                await db.commit()
+            except Exception:
+                pass  # Column already exists
             
             # Channels table
             await db.execute("""
@@ -208,15 +216,16 @@ class DatabaseManager:
         return True
     
     # Account management
-    async def add_account(self, phone: str, session_name: str) -> bool:
+    async def add_account(self, phone: str, session_name: str, username: str = None) -> bool:
         """Add a new Telethon account"""
         try:
             await self._execute_with_lock("""
-                INSERT INTO accounts (phone, session_name, status)
-                VALUES (?, ?, ?)
-            """, (phone, session_name, AccountStatus.ACTIVE.value))
+                INSERT INTO accounts (phone, username, session_name, status)
+                VALUES (?, ?, ?, ?)
+            """, (phone, username, session_name, AccountStatus.ACTIVE.value))
             await self._commit_with_lock()
-            await self.log_action(LogType.JOIN, message=f"Account {phone} added successfully")
+            display_name = username if username else phone
+            await self.log_action(LogType.JOIN, message=f"Account {display_name} added successfully")
             return True
         except Exception as e:
             logger.error(f"Error adding account {phone}: {e}")
@@ -239,7 +248,7 @@ class DatabaseManager:
             async with self._operation_lock:
                 connection = await self._ensure_connection()
                 async with connection.execute("""
-                    SELECT id, phone, session_name, status, flood_wait_until, 
+                    SELECT id, phone, username, session_name, status, flood_wait_until, 
                            created_at, last_used, failed_attempts
                     FROM accounts ORDER BY created_at
                 """) as cursor:
@@ -247,13 +256,14 @@ class DatabaseManager:
                     return [
                         {
                             "id": row[0],
-                            "phone": row[1], 
-                            "session_name": row[2],
-                            "status": row[3],
-                            "flood_wait_until": row[4],
-                            "created_at": row[5],
-                            "last_used": row[6],
-                            "failed_attempts": row[7]
+                            "phone": row[1],
+                            "username": row[2],
+                            "session_name": row[3],
+                            "status": row[4],
+                            "flood_wait_until": row[5],
+                            "created_at": row[6],
+                            "last_used": row[7],
+                            "failed_attempts": row[8]
                         }
                         for row in rows
                     ]
@@ -268,7 +278,7 @@ class DatabaseManager:
             async with self._operation_lock:
                 connection = await self._ensure_connection()
                 async with connection.execute("""
-                    SELECT id, phone, session_name, status, flood_wait_until,
+                    SELECT id, phone, username, session_name, status, flood_wait_until,
                            created_at, last_used, failed_attempts
                     FROM accounts 
                     WHERE status = ? AND (flood_wait_until IS NULL OR flood_wait_until < ?)
@@ -279,12 +289,13 @@ class DatabaseManager:
                         {
                             "id": row[0],
                             "phone": row[1],
-                            "session_name": row[2],
-                            "status": row[3],
-                            "flood_wait_until": row[4],
-                            "created_at": row[5],
-                            "last_used": row[6],
-                            "failed_attempts": row[7]
+                            "username": row[2],
+                            "session_name": row[3],
+                            "status": row[4],
+                            "flood_wait_until": row[5],
+                            "created_at": row[6],
+                            "last_used": row[7],
+                            "failed_attempts": row[8]
                         }
                         for row in rows
                     ]
