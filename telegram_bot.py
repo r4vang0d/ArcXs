@@ -234,7 +234,7 @@ class ViewBoosterBot:
         
         try:
             current_state = await state.get_state()
-            message_text = message.text.strip()
+            message_text = message.text.strip() if message.text else ""
             logger.info(f"📨 Text message received from {user_id}: '{message_text}' | State: {current_state}")
             
             # Always try user handler first since most operations are user-related
