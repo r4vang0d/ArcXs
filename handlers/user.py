@@ -192,19 +192,22 @@ Features:
             if callback_query.message:
                 await callback_query.message.edit_text(
                     text,
-                    reply_markup=BotKeyboards.cancel_operation(),
-                    parse_mode="Markdown"
+                    reply_markup=BotKeyboards.cancel_operation()
                 )
             else:
                 await self.bot.send_message(
                     callback_query.from_user.id,
                     text,
-                    reply_markup=BotKeyboards.cancel_operation(),
-                    parse_mode="Markdown"
+                    reply_markup=BotKeyboards.cancel_operation()
                 )
         except Exception as e:
             logger.error(f"Error starting add channel: {e}")
-            await callback_query.answer("Add channel started!", show_alert=False)
+            # Send simple fallback message if editing fails
+            await self.bot.send_message(
+                callback_query.from_user.id,
+                "🎯 Add New Channel\n\nSend your Telegram channel link (like @channel or https://t.me/channel) or type /cancel to exit",
+                reply_markup=BotKeyboards.cancel_operation()
+            )
         await state.set_state(UserStates.waiting_for_channel)
         await callback_query.answer()
     
