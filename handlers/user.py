@@ -522,16 +522,23 @@ Send message IDs or "auto", or /cancel to abort.
         """Show user settings"""
         user_id = callback_query.from_user.id
         
-        views_only = await self.get_user_setting(user_id, "views_only")
-        rotation = await self.get_user_setting(user_id, "account_rotation")
-        delay_level = await self.get_user_setting(user_id, "delay_level")
-        
-        # Provide default values if None
-        views_only = views_only if views_only is not None else False
-        rotation = rotation if rotation is not None else False
-        delay_level = delay_level if delay_level is not None else "medium"
-        
-        text = f"""
+        try:
+            views_only = await self.get_user_setting(user_id, "views_only")
+            rotation = await self.get_user_setting(user_id, "account_rotation")
+            delay_level = await self.get_user_setting(user_id, "delay_level")
+            
+            # Provide default values if None
+            views_only = views_only if views_only is not None else False
+            rotation = rotation if rotation is not None else False
+            delay_level = delay_level if delay_level is not None else "medium"
+            
+            # Ensure delay_level is a valid string
+            if not isinstance(delay_level, str) or delay_level not in ["low", "medium", "high"]:
+                delay_level = "medium"
+            
+            delay_range = Utils.get_delay_range(delay_level)
+            
+            text = f"""
 ⚙️ **Settings**
 
 📖 **Boost Mode:**
@@ -541,18 +548,22 @@ Currently: {'👁️ Views Only' if views_only else '👁️📖 Views + Read'}
 Currently: {'✅ Enabled' if rotation else '❌ Disabled'}
 
 ⏱️ **Boost Delay:**
-Currently: {delay_level.title()} ({dict(Utils.get_delay_range(delay_level))[0]}-{dict(Utils.get_delay_range(delay_level))[1]}s)
+Currently: {delay_level.title()} ({delay_range[0]}-{delay_range[1]}s)
 
 Choose a setting to modify:
-        """
-        
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=BotKeyboards.settings_menu(),
-                parse_mode="Markdown"
-            )
-        await callback_query.answer()
+            """
+            
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.settings_menu(),
+                    parse_mode="Markdown"
+                )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error showing settings: {e}")
+            await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
     
     async def handle_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle setting changes"""
