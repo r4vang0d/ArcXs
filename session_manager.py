@@ -17,6 +17,7 @@ from telethon.errors import (
     UserBannedInChannelError, UserAlreadyParticipantError, PeerFloodError
 )
 from telethon.tl.functions.messages import GetMessagesViewsRequest, SendReactionRequest
+from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser, ReactionEmoji
 
 from database import DatabaseManager, AccountStatus, LogType
@@ -615,30 +616,58 @@ class TelethonManager:
     async def check_channel_for_live_stream(self, channel_link: str) -> bool:
         """Check if a channel currently has live streams"""
         if not self.active_clients:
+            logger.warning(f"No active clients available to check live stream for {channel_link}")
             return False
         
         try:
             client = self.clients[self.active_clients[0]]
             entity = await client.get_entity(channel_link)
             
-            # Get recent messages to check for live streams
-            messages = await client.get_messages(entity, limit=5)
+            logger.debug(f"Checking {channel_link} for live streams...")
             
-            for message in messages:
+            # Get recent messages to check for live streams (increased from 5 to 20)
+            messages = await client.get_messages(entity, limit=20)
+            
+            for i, message in enumerate(messages):
+                logger.debug(f"Checking message {i+1}: {message.date if message else 'No date'}")
+                
                 # Check if message has live stream or video call
                 if (message.media and hasattr(message.media, 'grouped_id') and 
                     hasattr(message, 'action') and 
                     message.action and 
                     'video_chat' in str(type(message.action)).lower()):
+                    logger.info(f"🔴 Live stream detected via video_chat action in {channel_link}")
                     return True
                 
-                # Check if message text indicates live stream
+                # Check if message text indicates live stream (expanded keywords)
                 if message.text:
-                    live_keywords = ['live stream', 'live streaming', 'going live', 'live now', '🔴', 'live video']
+                    live_keywords = [
+                        'live stream', 'live streaming', 'going live', 'live now', '🔴', 'live video',
+                        'streaming now', 'started streaming', 'stream started', 'on air', 'broadcasting',
+                        'live broadcast', 'currently streaming', 'livestream', 'live:', 'stream:',
+                        'started a video chat', 'joined video chat', 'video chat started'
+                    ]
                     text_lower = message.text.lower()
-                    if any(keyword in text_lower for keyword in live_keywords):
+                    for keyword in live_keywords:
+                        if keyword in text_lower:
+                            logger.info(f"🔴 Live stream detected via keyword '{keyword}' in message: {message.text[:100]}...")
+                            return True
+                
+                # Check message media for live stream indicators
+                if message.media:
+                    # Check for group call or voice chat media
+                    if hasattr(message.media, 'call'):
+                        return True
+                    
+                    # Check for message service actions that indicate live streams
+                if hasattr(message, 'action') and message.action:
+                    action_str = str(type(message.action).__name__).lower()
+                    action_type = str(message.action)
+                    if any(term in action_str for term in ['groupcall', 'videochat', 'call']):
+                        logger.info(f"🔴 Live stream detected via action: {action_str} - {action_type}")
                         return True
             
+            logger.debug(f"No live stream detected in {channel_link} after checking {len(messages)} messages")
             return False
             
         except Exception as e:

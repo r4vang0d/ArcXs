@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
-from database import DatabaseManager
+from database import DatabaseManager, LogType
 from session_manager import TelethonManager
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class LiveMonitorService:
         self.telethon = telethon_manager
         self.is_running = False
         self.monitor_task = None
-        self.check_interval = 30  # Check every 30 seconds
+        self.check_interval = 15  # Check every 15 seconds for faster detection
         
     async def start_monitoring(self):
         """Start the live monitoring service"""
@@ -107,7 +107,7 @@ class LiveMonitorService:
                     
                     # Log the successful live join
                     await self.db.log_action(
-                        "LIVE_JOIN",
+                        LogType.LIVE_JOIN,
                         user_id=monitor['user_id'],
                         message=f"Auto-joined live stream in {channel_link} with {accounts_joined} accounts"
                     )

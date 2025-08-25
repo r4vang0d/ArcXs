@@ -23,6 +23,7 @@ class LogType(Enum):
     ERROR = "error"
     BAN = "ban"
     FLOOD_WAIT = "flood_wait"
+    LIVE_JOIN = "live_join"
 
 class DatabaseManager:
     """Manages SQLite database operations"""
