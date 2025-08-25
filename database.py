@@ -651,7 +651,19 @@ class DatabaseManager:
                 ORDER BY last_checked ASC
             """)
             rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            
+            # Convert rows to dictionaries properly
+            result = []
+            for row in rows:
+                result.append({
+                    "id": row[0],
+                    "user_id": row[1], 
+                    "channel_link": row[2],
+                    "title": row[3],
+                    "last_checked": row[4],
+                    "live_count": row[5]
+                })
+            return result
     
     async def update_live_monitor_check(self, monitor_id: int, live_detected: bool = False):
         """Update last checked time and live count"""

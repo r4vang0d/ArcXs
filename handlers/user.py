@@ -75,6 +75,10 @@ class UserHandler:
             await self.show_live_channel_info(callback_query, data)
         elif data.startswith("remove_live_channel:"):
             await self.confirm_remove_live_channel(callback_query, data)
+        elif data == "start_live_monitor":
+            await self.start_live_monitoring(callback_query)
+        elif data == "stop_live_monitor":
+            await self.stop_live_monitoring(callback_query)
         elif data.startswith("channel_info:"):
             await self.show_channel_info(callback_query, data)
         elif data.startswith("remove_channel:"):
@@ -1487,3 +1491,44 @@ Use the buttons below to manage this channel."""
             
         except (ValueError, IndexError):
             await callback_query.answer("Invalid channel ID", show_alert=True)
+    
+    async def start_live_monitoring(self, callback_query: types.CallbackQuery):
+        """Start live monitoring service"""
+        await callback_query.answer()
+        
+        text = """🔴 **Live Monitoring Started**
+
+✅ The live monitoring service is now actively scanning all your monitored channels for live streams every 30 seconds.
+
+📊 **Status:**
+• Service: Active
+• Scan Interval: 30 seconds
+• Auto-join: Enabled
+
+When a live stream is detected, all your accounts will automatically join the stream."""
+
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.live_management()
+        )
+    
+    async def stop_live_monitoring(self, callback_query: types.CallbackQuery):
+        """Stop live monitoring service"""
+        await callback_query.answer()
+        
+        text = """⏹️ **Live Monitoring Stopped**
+
+🔴 The live monitoring service has been paused. No automatic scanning for live streams will occur.
+
+📊 **Status:**
+• Service: Inactive
+• Auto-join: Disabled
+
+You can restart monitoring anytime by clicking "Start Monitoring"."""
+
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.live_management()
+        )
