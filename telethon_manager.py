@@ -34,17 +34,21 @@ class TelethonManager:
         self.active_clients: List[str] = []
         self._client_lock = asyncio.Lock()
     
-    async def add_account_interactive(self, phone: str) -> Tuple[bool, str]:
+    async def add_account_interactive(self, phone: str, api_id: int = None, api_hash: str = None) -> Tuple[bool, str]:
         """
         Add a new account via interactive phone login
         Returns (success, message)
         """
+        # Use provided credentials or fall back to defaults
+        api_id = api_id or self.config.DEFAULT_API_ID
+        api_hash = api_hash or self.config.DEFAULT_API_HASH
+        
         session_name = f"session_{phone.replace('+', '').replace('-', '').replace(' ', '')}"
         session_path = os.path.join(self.config.SESSION_DIR, session_name)
         
         try:
-            # Create Telethon client
-            client = TelegramClient(session_path, self.config.API_ID, self.config.API_HASH)
+            # Create Telethon client with provided/default credentials
+            client = TelegramClient(session_path, api_id, api_hash)
             
             # Start the client
             await client.start(phone=phone)

@@ -17,16 +17,18 @@ class Config:
         if not self.BOT_TOKEN:
             raise ValueError("BOT_TOKEN is required in environment variables")
         
-        # Telegram API Configuration
-        self.API_ID = os.getenv("API_ID")
-        self.API_HASH = os.getenv("API_HASH")
-        if not self.API_ID or not self.API_HASH:
-            raise ValueError("API_ID and API_HASH are required in environment variables")
+        # Default Telegram API Configuration (fallback)
+        self.DEFAULT_API_ID = int(os.getenv("DEFAULT_API_ID", "94575"))
+        self.DEFAULT_API_HASH = os.getenv("DEFAULT_API_HASH", "a3406de8d171bb422bb6ddf3bbd800e2")
+        
+        # Legacy API Configuration (for backward compatibility)
+        self.API_ID = os.getenv("API_ID", str(self.DEFAULT_API_ID))
+        self.API_HASH = os.getenv("API_HASH", self.DEFAULT_API_HASH)
         
         try:
             self.API_ID = int(self.API_ID)
         except ValueError:
-            raise ValueError("API_ID must be a valid integer")
+            self.API_ID = self.DEFAULT_API_ID
         
         # Admin Configuration
         admin_ids_str = os.getenv("ADMIN_IDS", "")

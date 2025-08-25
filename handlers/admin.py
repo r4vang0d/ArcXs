@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 class AdminStates(StatesGroup):
     waiting_for_phone = State()
     waiting_for_remove_phone = State()
+    waiting_for_api_choice = State()
+    waiting_for_custom_api_id = State()
+    waiting_for_custom_api_hash = State()
 
 class AdminHandler:
     """Handles admin-specific operations"""
@@ -57,6 +60,12 @@ class AdminHandler:
             await self.list_accounts(callback_query)
         elif data == "refresh_accounts":
             await self.refresh_account_status(callback_query)
+        elif data == "api_default":
+            await self.use_default_api(callback_query, state)
+        elif data == "api_custom":
+            await self.use_custom_api(callback_query, state)
+        elif data == "cancel_operation":
+            await self.cancel_operation(callback_query, state)
         elif data.startswith("logs_"):
             await self.show_filtered_logs(callback_query, data)
         elif data.startswith("account_details:"):
@@ -72,6 +81,10 @@ class AdminHandler:
             await self.process_add_account(message, state)
         elif current_state == AdminStates.waiting_for_remove_phone.state:
             await self.process_remove_account(message, state)
+        elif current_state == AdminStates.waiting_for_custom_api_id.state:
+            await self.process_custom_api_id(message, state)
+        elif current_state == AdminStates.waiting_for_custom_api_hash.state:
+            await self.process_custom_api_hash(message, state)
     
     async def show_admin_panel(self, callback_query: types.CallbackQuery):
         """Show main admin panel"""
@@ -124,30 +137,36 @@ Quick Actions:
     
     async def start_add_account(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Start add account process"""
-        text = """
+        text = f"""
 ➕ **Add New Account**
 
-Please send the phone number for the new account.
+Choose API credentials to use:
 
-Format examples:
-• +1234567890
-• +44 123 456 7890
-• 1234567890
+🔹 **Default API** (Recommended)
+• Quick and easy setup
+• Uses system default credentials
+• API ID: {self.config.DEFAULT_API_ID}
 
-⚠️ Make sure:
-• The phone number has Telegram registered
-• You have access to SMS/calls for verification
-• Two-factor authentication is disabled
+🔸 **Custom API** (Advanced)
+• Use your own API credentials
+• Get from https://my.telegram.org
+• More control and privacy
 
-Send the phone number or /cancel to abort.
+Choose your preferred method:
         """
+        
+        buttons = [
+            [types.InlineKeyboardButton(text="🔹 Use Default API", callback_data="api_default")],
+            [types.InlineKeyboardButton(text="🔸 Use Custom API", callback_data="api_custom")],
+            [types.InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_operation")]
+        ]
         
         await callback_query.message.edit_text(
             text,
-            reply_markup=BotKeyboards.cancel_operation(),
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=buttons),
             parse_mode="Markdown"
         )
-        await state.set_state(AdminStates.waiting_for_phone)
+        await state.set_state(AdminStates.waiting_for_api_choice)
         await callback_query.answer()
     
     async def process_add_account(self, message: types.Message, state: FSMContext):
@@ -165,11 +184,16 @@ Send the phone number or /cancel to abort.
         
         formatted_phone = Utils.format_phone(phone)
         
+        # Get API credentials from state
+        data = await state.get_data()
+        api_id = data.get("api_id", self.config.DEFAULT_API_ID)
+        api_hash = data.get("api_hash", self.config.DEFAULT_API_HASH)
+        
         # Show processing message
         processing_msg = await message.answer("⏳ Adding account... This may take a moment.")
         
         try:
-            success, result_message = await self.telethon.add_account_interactive(formatted_phone)
+            success, result_message = await self.telethon.add_account_interactive(formatted_phone, api_id, api_hash)
             
             await processing_msg.delete()
             
@@ -193,6 +217,164 @@ Send the phone number or /cancel to abort.
             )
         
         await state.clear()
+    
+    async def use_default_api(self, callback_query: types.CallbackQuery, state: FSMContext):
+        """Use default API credentials"""
+        await state.update_data(api_id=self.config.DEFAULT_API_ID, api_hash=self.config.DEFAULT_API_HASH)
+        
+        text = f"""
+📱 **Add Account - Default API**
+
+Using default API credentials:
+• API ID: {self.config.DEFAULT_API_ID}
+• API Hash: {self.config.DEFAULT_API_HASH[:8]}...
+
+Please send the phone number for the new account.
+
+📋 **Format examples:**
+• +1234567890
+• +44 123 456 7890
+• 1234567890
+
+⚠️ **Requirements:**
+• Phone number has Telegram registered
+• Access to SMS/calls for verification
+• Two-factor authentication disabled
+
+Send the phone number or /cancel to abort.
+        """
+        
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=BotKeyboards.cancel_operation(),
+            parse_mode="Markdown"
+        )
+        await state.set_state(AdminStates.waiting_for_phone)
+        await callback_query.answer()
+    
+    async def use_custom_api(self, callback_query: types.CallbackQuery, state: FSMContext):
+        """Guide user to get custom API credentials"""
+        text = """
+🔸 **Custom API Setup**
+
+📋 **Step 1: Get Your API Credentials**
+
+1️⃣ Visit https://my.telegram.org
+2️⃣ Login with your phone number
+3️⃣ Go to "API Development Tools"
+4️⃣ Create a new app:
+   • App title: Any name (e.g., "My Bot")
+   • Short name: Any short name
+   • Platform: Other
+   • Description: Optional
+
+5️⃣ Copy your credentials:
+   • **api_id** (number)
+   • **api_hash** (32-character string)
+
+📱 **Step 2: Send Your API ID**
+
+Please send your **API ID** (numbers only):
+Example: 12345678
+
+Or /cancel to abort.
+        """
+        
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=BotKeyboards.cancel_operation(),
+            parse_mode="Markdown"
+        )
+        await state.set_state(AdminStates.waiting_for_custom_api_id)
+        await callback_query.answer()
+    
+    async def process_custom_api_id(self, message: types.Message, state: FSMContext):
+        """Process custom API ID input"""
+        api_id_text = message.text.strip()
+        
+        if api_id_text == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled", reply_markup=BotKeyboards.account_management())
+            return
+        
+        try:
+            api_id = int(api_id_text)
+            await state.update_data(api_id=api_id)
+            
+            text = f"""
+✅ **API ID Saved: {api_id}**
+
+📱 **Step 3: Send Your API Hash**
+
+Please send your **API Hash** (32-character string):
+Example: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+
+⚠️ **Important:**
+• API Hash is case-sensitive
+• Must be exactly 32 characters
+• Contains letters and numbers
+
+Send your API Hash or /cancel to abort.
+            """
+            
+            await message.answer(text, reply_markup=BotKeyboards.cancel_operation(), parse_mode="Markdown")
+            await state.set_state(AdminStates.waiting_for_custom_api_hash)
+            
+        except ValueError:
+            await message.answer("❌ Invalid API ID. Please send numbers only (e.g., 12345678) or /cancel")
+    
+    async def process_custom_api_hash(self, message: types.Message, state: FSMContext):
+        """Process custom API Hash input"""
+        api_hash = message.text.strip()
+        
+        if api_hash == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled", reply_markup=BotKeyboards.account_management())
+            return
+        
+        if len(api_hash) != 32:
+            await message.answer("❌ Invalid API Hash. Must be exactly 32 characters. Please try again or /cancel")
+            return
+        
+        data = await state.get_data()
+        api_id = data.get("api_id")
+        await state.update_data(api_hash=api_hash)
+        
+        text = f"""
+✅ **Custom API Credentials Set**
+
+• API ID: {api_id}
+• API Hash: {api_hash[:8]}...
+
+📱 **Final Step: Phone Number**
+
+Please send the phone number for the new account.
+
+📋 **Format examples:**
+• +1234567890
+• +44 123 456 7890
+• 1234567890
+
+⚠️ **Requirements:**
+• Phone number has Telegram registered
+• Access to SMS/calls for verification
+• Two-factor authentication disabled
+
+Send the phone number or /cancel to abort.
+        """
+        
+        await message.answer(text, reply_markup=BotKeyboards.cancel_operation(), parse_mode="Markdown")
+        await state.set_state(AdminStates.waiting_for_phone)
+    
+    async def cancel_operation(self, callback_query: types.CallbackQuery, state: FSMContext):
+        """Cancel current operation"""
+        await state.clear()
+        await callback_query.message.edit_text(
+            "❌ **Operation Cancelled**\n\nReturning to account management.",
+            reply_markup=BotKeyboards.account_management(),
+            parse_mode="Markdown"
+        )
+        await callback_query.answer()
     
     async def start_remove_account(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Start remove account process"""
