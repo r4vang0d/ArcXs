@@ -633,7 +633,7 @@ Choose log type to view:
             
             for log in logs:
                 timestamp = Utils.format_datetime(log["created_at"])
-                message = log["message"] or "No message"
+                message = Utils.escape_markdown(log["message"] or "No message")
                 account = f" | {log['account_phone']}" if log["account_phone"] else ""
                 
                 text += f"🕐 {timestamp}\n"
@@ -658,18 +658,19 @@ Choose log type to view:
             
             for log in error_logs:
                 timestamp = Utils.format_datetime(log["created_at"])
-                message = log["message"] or "Unknown error"
+                message = Utils.escape_markdown(log["message"] or "Unknown error")
                 account = log["account_phone"] or "Unknown account"
                 
                 text += f"🕐 {timestamp}\n"
                 text += f"📱 {account}\n"
                 text += f"❌ {message}\n\n"
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.back_button("admin_panel"),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.back_button("admin_panel"),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_banned_accounts(self, callback_query: types.CallbackQuery):
