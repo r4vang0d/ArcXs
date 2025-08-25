@@ -62,44 +62,63 @@ class ViewBoosterBot:
                                lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
-        """Handle /start command"""
+        """Handle /start command - Admin only"""
         if not message.from_user:
             return
         user_id = message.from_user.id
         
-        # Add user to database if not exists
-        await self.db.add_user(user_id)
+        # Check if user is admin - block non-admins
+        if not self.config.is_admin(user_id):
+            await message.answer(
+                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                parse_mode="Markdown"
+            )
+            return
         
-        # Check if user is admin
-        is_admin = self.config.is_admin(user_id)
+        # Add admin to database if not exists (with all premium features)
+        await self.db.add_user(user_id, premium=True)
         
         welcome_text = f"""
-🎯 **Welcome to View Booster Bot!**
+🎯 **Personal View Booster Bot**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-👋 Hello **{message.from_user.first_name or 'User'}**! 
+👋 Welcome back **{message.from_user.first_name or 'Admin'}**! 
 
-🚀 This bot helps you manage Telegram channels and boost views using multiple accounts with advanced automation.
+🚀 Your personal Telegram channel management system with advanced automation.
 
-{'🛠 **Admin Features Available:**' if is_admin else '⭐ **Features Available:**'}
-{'📱 Manage Telethon accounts' if is_admin else '📢 Add channels for boosting'}
-{'💚 Monitor system health' if is_admin else '⚡ Boost channel views instantly'}
-{'📊 View detailed logs & analytics' if is_admin else '📈 Track your statistics'}
-{'👥 User management dashboard' if is_admin else '⚙️ Configure boost settings'}
+🛠 **Available Features:**
+📱 Manage Telethon accounts
+🎯 Add & manage channels
+⚡ Boost channel views instantly
+💚 Monitor system health
+📊 View detailed analytics & logs
+⚙️ Configure boost settings
 
-{'🎛 Choose your panel below:' if is_admin else '🚀 Ready to boost your views?'}
+🎛 **Ready to manage your channels?**
         """
         
         await message.answer(
             welcome_text,
-            reply_markup=BotKeyboards.main_menu(is_admin),
+            reply_markup=BotKeyboards.personal_main_menu(),
             parse_mode="Markdown"
         )
     
     async def help_command(self, message: types.Message):
-        """Handle /help command"""
+        """Handle /help command - Admin only"""
+        if not message.from_user:
+            return
+        user_id = message.from_user.id
+        
+        # Check if user is admin
+        if not self.config.is_admin(user_id):
+            await message.answer(
+                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                parse_mode="Markdown"
+            )
+            return
+        
         help_text = """
-📚 **Bot Help & Commands**
+📚 **Personal Bot Help & Commands**
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🤖 **Available Commands:**
@@ -110,16 +129,16 @@ class ViewBoosterBot:
 🎯 **How to Use:**
 
 **1️⃣ Add Channel**
-📢 Use "Add Channel" to add channels for boosting
+📢 Add unlimited channels for boosting
 
 **2️⃣ Boost Views** 
 ⚡ Select channel and boost message views instantly
 
-**3️⃣ Configure Settings**
-⚙️ Customize boost behavior and timing
+**3️⃣ Manage Accounts**
+📱 Add/remove Telethon accounts for automation
 
-**4️⃣ Track Results**
-📈 Monitor your boost history and statistics
+**4️⃣ Monitor System**
+💚 Track account health and system logs
 
 📱 **Supported Link Formats:**
 • `https://t.me/channel_name`
@@ -131,31 +150,37 @@ class ViewBoosterBot:
 • 👁️ Views Only vs 👁️📖 Views + Read
 • 🔄 Account Rotation ON/OFF
 • ⏱️ Delay levels (🐇 Fast / 🚶 Medium / 🐢 Safe)
+• 📊 Detailed analytics and logging
 
-💡 **Need Support?** Contact the bot administrator.
+💡 **Personal Use Only** - All features available without limits.
         """
         
         await message.answer(help_text, parse_mode="Markdown")
     
     async def stats_command(self, message: types.Message):
-        """Handle /stats command"""
+        """Handle /stats command - Admin only"""
         if not message.from_user:
             return
         user_id = message.from_user.id
+        
+        # Check if user is admin
+        if not self.config.is_admin(user_id):
+            await message.answer(
+                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                parse_mode="Markdown"
+            )
+            return
         
         # Get user statistics
         channels = await self.db.get_user_channels(user_id)
         total_channels = len(channels)
         total_boosts = sum(channel.get("total_boosts", 0) for channel in channels)
         
-        # Check if premium
-        is_premium = await self.db.is_premium_user(user_id)
-        
         stats_text = f"""
-📊 **Your Statistics**
+📊 **Your Personal Bot Statistics**
 
-👤 **Account Type**: {'Premium ⭐' if is_premium else 'Free 🆓'}
-📢 **Channels**: {total_channels}{'/' + ('∞' if is_premium else '1')}
+👤 **Account Type**: Personal Admin ⭐
+📢 **Channels**: {total_channels} (Unlimited)
 ⚡ **Total Boosts**: {total_boosts:,}
 
 📈 **Recent Activity:**
@@ -191,8 +216,11 @@ class ViewBoosterBot:
                 await self.admin_handler.handle_callback(callback_query, state)
                 return
             
-            # User handlers
-            await self.user_handler.handle_callback(callback_query, state)
+            # User handlers (admin-only mode)
+            if self.config.is_admin(user_id):
+                await self.user_handler.handle_callback(callback_query, state)
+            else:
+                await callback_query.answer("❌ Access denied. Personal use only.", show_alert=True)
             
         except Exception as e:
             logger.error(f"Error handling callback {data}: {e}")
@@ -209,8 +237,11 @@ class ViewBoosterBot:
             await self.admin_handler.handle_message(message, state)
             return
         
-        # Handle user input
-        await self.user_handler.handle_message(message, state)
+        # Handle user input (admin-only mode)
+        if self.config.is_admin(user_id):
+            await self.user_handler.handle_message(message, state)
+        else:
+            await message.answer("❌ Access denied. Personal use only.")
     
     async def start(self):
         """Start the bot"""

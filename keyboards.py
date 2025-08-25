@@ -29,6 +29,20 @@ class BotKeyboards:
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
     @staticmethod
+    def personal_main_menu() -> InlineKeyboardMarkup:
+        """Personal admin main menu with all features accessible"""
+        buttons = [
+            [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
+             InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views")],
+            [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
+             InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats")],
+            [InlineKeyboardButton(text="💚 System Health", callback_data="admin_health"),
+             InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
+            [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
     def user_panel() -> InlineKeyboardMarkup:
         """User panel keyboard"""
         buttons = [
@@ -43,14 +57,12 @@ class BotKeyboards:
     
     @staticmethod
     def admin_panel() -> InlineKeyboardMarkup:
-        """Admin panel keyboard"""
+        """Admin panel keyboard - Simplified for personal use"""
         buttons = [
             [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
              InlineKeyboardButton(text="💚 Account Health", callback_data="admin_health")],
-            [InlineKeyboardButton(text="💎 Premium Management", callback_data="admin_premium"),
-             InlineKeyboardButton(text="🎯 Channel Control", callback_data="admin_channel_control")],
-            [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs"),
-             InlineKeyboardButton(text="👥 User Stats", callback_data="admin_users")],
+            [InlineKeyboardButton(text="🎯 Channel Control", callback_data="admin_channel_control"),
+             InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
             [InlineKeyboardButton(text="⚠️ Failed Operations", callback_data="admin_failed"),
              InlineKeyboardButton(text="🚫 Banned Accounts", callback_data="admin_banned")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
@@ -71,13 +83,10 @@ class BotKeyboards:
     
     @staticmethod
     def premium_management() -> InlineKeyboardMarkup:
-        """Premium management keyboard"""
+        """Premium management keyboard - Simplified for personal use"""
         buttons = [
-            [InlineKeyboardButton(text="⬆️ Upgrade User", callback_data="premium_upgrade"),
-             InlineKeyboardButton(text="⬇️ Downgrade User", callback_data="premium_downgrade")],
-            [InlineKeyboardButton(text="⚙️ Custom Limits", callback_data="premium_limits"),
-             InlineKeyboardButton(text="👥 Premium Users", callback_data="premium_list")],
-            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+            [InlineKeyboardButton(text="⚙️ Custom Limits", callback_data="premium_limits")],
+            [InlineKeyboardButton(text="🔙 Back to Main", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     

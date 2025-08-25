@@ -118,14 +118,13 @@ class UserHandler:
         # Get user stats
         channels = await self.db.get_user_channels(user_id)
         total_boosts = sum(channel.get("total_boosts", 0) for channel in channels)
-        is_premium = await self.db.is_premium_user(user_id)
         
         panel_text = f"""
 🎭 **Personal Dashboard**
 
 ┌──── 📊 **Account Overview** ────┐
-│ Status: {'🌟 Premium Elite' if is_premium else '🎯 Free Tier'}
-│ Channels: {len(channels)}/{('∞' if is_premium else '1')} slots
+│ Status: 🌟 Personal Admin Access
+│ Channels: {len(channels)}/∞ (Unlimited)
 │ Total Boosts: {total_boosts:,} views
 └─────────────────────────────────┘
 
@@ -145,16 +144,7 @@ class UserHandler:
         """Start add channel process"""
         user_id = callback_query.from_user.id
         
-        # Check limits for free users
-        is_premium = await self.db.is_premium_user(user_id)
-        if not is_premium:
-            channels = await self.db.get_user_channels(user_id)
-            if len(channels) >= 1:
-                await callback_query.answer(
-                    "❌ Free users can only add 1 channel. Upgrade to Premium for unlimited channels!",
-                    show_alert=True
-                )
-                return
+        # Personal use - no limits
         
         text = """
 ➕ **Channel Integration**
@@ -299,7 +289,6 @@ class UserHandler:
         """Show user statistics"""
         user_id = callback_query.from_user.id
         channels = await self.db.get_user_channels(user_id)
-        is_premium = await self.db.is_premium_user(user_id)
         
         total_boosts = sum(channel.get("total_boosts", 0) for channel in channels)
         
@@ -311,11 +300,11 @@ class UserHandler:
 📊 **My Statistics**
 
 👤 **Account Info:**
-Status: {'Premium ⭐' if is_premium else 'Free 🆓'}
+Status: Personal Admin Access ⭐
 Member Since: {Utils.format_datetime(None)}
 
 📢 **Channel Stats:**
-Total Channels: {len(channels)}
+Total Channels: {len(channels)} (Unlimited)
 Total Boosts: {total_boosts:,}
 
 📈 **Recent Activity:**
