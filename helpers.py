@@ -65,27 +65,34 @@ class Utils:
     def parse_user_settings(settings_json: str) -> Dict[str, Any]:
         """Parse user settings from JSON string"""
         try:
+            logger.info(f"🔧 DEBUG: Parsing settings JSON: {settings_json}")
             if not settings_json:
-                return {
+                default_settings = {
                     "views_only": False,  # Default: views + read
                     "account_rotation": True,  # Always enabled
                     "delay_level": "medium",
                     "auto_join": True,
                     "auto_message_count": 10  # Default: boost last 10 messages
                 }
+                logger.info(f"🔧 DEBUG: Using default settings: {default_settings}")
+                return default_settings
             settings = json.loads(settings_json)
+            logger.info(f"🔧 DEBUG: Parsed settings before modification: {settings}")
             # Force account rotation to always be True
             settings["account_rotation"] = True
+            logger.info(f"🔧 DEBUG: Final settings after modification: {settings}")
             return settings
         except Exception as e:
             logger.error(f"Error parsing user settings: {e}")
-            return {
+            default_settings = {
                 "views_only": False,
                 "account_rotation": True,  # Always enabled
                 "delay_level": "medium",
                 "auto_join": True,
                 "auto_message_count": 10  # Default: boost last 10 messages
             }
+            logger.info(f"🔧 DEBUG: Using default settings due to error: {default_settings}")
+            return default_settings
     
     @staticmethod
     def serialize_user_settings(settings: Dict[str, Any]) -> str:
