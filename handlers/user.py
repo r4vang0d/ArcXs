@@ -10,6 +10,7 @@ from typing import Optional
 from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import Config
 from database import DatabaseManager, LogType
