@@ -57,6 +57,8 @@ class UserHandler:
             await self.show_my_stats(callback_query)
         elif data == "boost_views":
             await self.show_boost_menu(callback_query)
+        elif data == "emoji_reactions":
+            await self.show_emoji_reactions_menu(callback_query)
         elif data == "settings":
             await self.show_settings(callback_query)
         elif data.startswith("channel_info:"):
@@ -729,6 +731,66 @@ Send message IDs or "auto", or /cancel to abort.
             )
         
         await state.clear()
+
+    async def show_emoji_reactions_menu(self, callback_query: types.CallbackQuery):
+        """Show emoji reactions menu - direct access from main menu"""
+        try:
+            user_id = callback_query.from_user.id
+            
+            # Get user channels
+            channels = await self.db.get_user_channels(user_id)
+            
+            text = """
+🎭 **Emoji Reactions Hub**
+
+Choose a channel to add random emoji reactions with account rotation:
+
+🔥 **How it works:**
+• Each message gets a different account reaction
+• Random emojis: ❤️ 👍 😂 🔥 💯 🎉 😍 and 20+ more
+• Smart account cycling for natural engagement
+• Works with "auto" or specific message IDs
+
+Select a channel below to start:
+            """
+            
+            # Create channel selection buttons
+            buttons = []
+            
+            if channels:
+                for channel in channels[:8]:  # Limit to 8 channels
+                    channel_name = channel.get("title") or channel["channel_link"]
+                    if len(channel_name) > 25:
+                        channel_name = channel_name[:22] + "..."
+                    
+                    buttons.append([
+                        InlineKeyboardButton(
+                            text=f"🎭 {channel_name}",
+                            callback_data=f"add_reactions:{channel['id']}"
+                        )
+                    ])
+            else:
+                buttons.append([
+                    InlineKeyboardButton(text="➕ Add Channel First", callback_data="add_channel")
+                ])
+            
+            buttons.append([
+                InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
+            ])
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+            
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error showing emoji reactions menu: {e}")
+            await callback_query.answer("❌ Error loading reactions menu", show_alert=True)
     
     async def show_settings(self, callback_query: types.CallbackQuery):
         """Show user settings"""

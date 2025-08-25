@@ -15,11 +15,12 @@ class BotKeyboards:
         buttons = [
             [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
              InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views")],
-            [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
+            [InlineKeyboardButton(text="🎭 Emoji Reactions", callback_data="emoji_reactions"),
              InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats")],
-            [InlineKeyboardButton(text="💚 System Health", callback_data="admin_health"),
-             InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
-            [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
+            [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
+             InlineKeyboardButton(text="💚 System Health", callback_data="admin_health")],
+            [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs"),
+             InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
