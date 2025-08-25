@@ -8,6 +8,10 @@ import logging
 import sys
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add current directory to Python path for imports
 sys.path.append(str(Path(__file__).parent))
