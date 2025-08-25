@@ -68,16 +68,19 @@ class Utils:
             if not settings_json:
                 return {
                     "views_only": False,  # Default: views + read
-                    "account_rotation": True,
+                    "account_rotation": True,  # Always enabled
                     "delay_level": "medium",
                     "auto_join": True
                 }
-            return json.loads(settings_json)
+            settings = json.loads(settings_json)
+            # Force account rotation to always be True
+            settings["account_rotation"] = True
+            return settings
         except Exception as e:
             logger.error(f"Error parsing user settings: {e}")
             return {
                 "views_only": False,
-                "account_rotation": True, 
+                "account_rotation": True,  # Always enabled
                 "delay_level": "medium",
                 "auto_join": True
             }
