@@ -526,6 +526,11 @@ Send message IDs or "auto", or /cancel to abort.
         rotation = await self.get_user_setting(user_id, "account_rotation")
         delay_level = await self.get_user_setting(user_id, "delay_level")
         
+        # Provide default values if None
+        views_only = views_only if views_only is not None else False
+        rotation = rotation if rotation is not None else False
+        delay_level = delay_level if delay_level is not None else "medium"
+        
         text = f"""
 ⚙️ **Settings**
 
