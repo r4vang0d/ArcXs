@@ -122,11 +122,10 @@ class UserHandler:
         panel_text = f"""
 🎭 **Personal Dashboard**
 
-┌──── 📊 **Account Overview** ────┐
-│ Status: 🌟 Personal Admin Access
-│ Channels: {len(channels)}/∞ (Unlimited)
-│ Total Boosts: {total_boosts:,} views
-└─────────────────────────────────┘
+**Account Overview:**
+• Status: 🌟 Personal Admin Access
+• Channels: {len(channels)} (Unlimited)  
+• Total Boosts: {total_boosts:,} views
 
 💪 **Ready to amplify your reach?**
 🚀 **Choose your next action below:**
@@ -147,28 +146,23 @@ class UserHandler:
         # Personal use - no limits
         
         text = """
-➕ **Channel Integration**
+🎯 **Add New Channel**
 
-┌──── 🎯 **Setup Instructions** ────┐
-│
-│ 📝 **Step 1:** Send your channel link
-│ 🔗 **Step 2:** Our system will auto-join
-│ ⚡ **Step 3:** Start boosting instantly!
-│
-└───────────────────────────────────┘
+**How it works:**
+1. Send your Telegram channel link
+2. System will automatically join with accounts
+3. Start boosting views instantly!
 
-📱 **Accepted Link Formats:**
-┌─────────────────────────────────┐
-│ ✅ https://t.me/your_channel    │
-│ ✅ https://t.me/joinchat/xxxxx  │
-│ ✅ @your_channel_name           │
-│ ✅ your_channel_name            │
-└─────────────────────────────────┘
+**Accepted formats:**
+• https://t.me/your_channel
+• https://t.me/joinchat/xxxxx
+• @your_channel_name
+• your_channel_name
 
-🚀 **Professional Features:**
-• 🤖 **Auto-join** with all premium accounts
-• 🔒 **Public & private** channel support  
-• ⚡ **Instant** integration process
+**Features:**
+• Auto-join with all accounts
+• Public and private channel support
+• Instant integration
 
 💬 **Send your channel link or type /cancel to exit**
         """
