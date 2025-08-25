@@ -47,6 +47,8 @@ class BotKeyboards:
         buttons = [
             [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
              InlineKeyboardButton(text="💚 Account Health", callback_data="admin_health")],
+            [InlineKeyboardButton(text="💎 Premium Management", callback_data="admin_premium"),
+             InlineKeyboardButton(text="🎯 Channel Control", callback_data="admin_channel_control")],
             [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs"),
              InlineKeyboardButton(text="👥 User Stats", callback_data="admin_users")],
             [InlineKeyboardButton(text="⚠️ Failed Operations", callback_data="admin_failed"),
@@ -63,6 +65,30 @@ class BotKeyboards:
              InlineKeyboardButton(text="📋 List Accounts", callback_data="list_accounts")],
             [InlineKeyboardButton(text="🗑️ Remove Account", callback_data="remove_account"),
              InlineKeyboardButton(text="🔄 Refresh Status", callback_data="refresh_accounts")],
+            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def premium_management() -> InlineKeyboardMarkup:
+        """Premium management keyboard"""
+        buttons = [
+            [InlineKeyboardButton(text="⬆️ Upgrade User", callback_data="premium_upgrade"),
+             InlineKeyboardButton(text="⬇️ Downgrade User", callback_data="premium_downgrade")],
+            [InlineKeyboardButton(text="⚙️ Custom Limits", callback_data="premium_limits"),
+             InlineKeyboardButton(text="👥 Premium Users", callback_data="premium_list")],
+            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def channel_control() -> InlineKeyboardMarkup:
+        """Channel control keyboard"""
+        buttons = [
+            [InlineKeyboardButton(text="✅ Whitelist Channel", callback_data="channel_whitelist"),
+             InlineKeyboardButton(text="❌ Blacklist Channel", callback_data="channel_blacklist")],
+            [InlineKeyboardButton(text="📋 View Lists", callback_data="channel_lists"),
+             InlineKeyboardButton(text="🗑️ Remove Entry", callback_data="channel_remove")],
             [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)

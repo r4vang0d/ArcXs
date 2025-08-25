@@ -57,6 +57,10 @@ class AdminHandler:
             await self.show_account_health(callback_query)
         elif data == "admin_users":
             await self.show_user_stats(callback_query)
+        elif data == "admin_premium":
+            await self.show_premium_management(callback_query)
+        elif data == "admin_channel_control":
+            await self.show_channel_control(callback_query)
         elif data == "add_account":
             await self.start_add_account(callback_query, state)
         elif data == "remove_account":
@@ -814,3 +818,66 @@ Use the account management menu to add/remove accounts.
         except Exception as e:
             logger.error(f"Error showing account details: {e}")
             await callback_query.answer("❌ Error loading account details", show_alert=True)
+    
+    # === Premium Management Functions ===
+    
+    async def show_premium_management(self, callback_query: types.CallbackQuery):
+        """Show premium management panel"""
+        premium_users = await self.db.get_premium_users()
+        premium_count = len(premium_users)
+        
+        text = f"""
+💎 **Premium Management Center**
+
+┌──── 📊 **Overview** ────┐
+│ Premium Users: {premium_count}
+│ Active Subscriptions: {premium_count}
+│ Total Revenue Tracking: Active
+└─────────────────────────┘
+
+🎯 **Management Options:**
+• ⬆️ **Upgrade User** - Grant premium access
+• ⬇️ **Downgrade User** - Remove premium status  
+• ⚙️ **Custom Limits** - Set individual user limits
+• 👥 **Premium Users** - View all premium members
+
+💡 **Quick Actions Available Below**
+        """
+        
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=BotKeyboards.premium_management(),
+            parse_mode="Markdown"
+        )
+        await callback_query.answer()
+    
+    async def show_channel_control(self, callback_query: types.CallbackQuery):
+        """Show channel control panel"""
+        channel_lists = await self.db.get_channel_control_lists()
+        whitelist_count = len(channel_lists["whitelisted"])
+        blacklist_count = len(channel_lists["blacklisted"])
+        
+        text = f"""
+🎯 **Channel Control Center**
+
+┌──── 📊 **Security Status** ────┐
+│ Whitelisted: {whitelist_count} channels
+│ Blacklisted: {blacklist_count} channels
+│ Protection Level: Active
+└────────────────────────────────┘
+
+🛡️ **Control Options:**
+• ✅ **Whitelist Channel** - Allow priority access
+• ❌ **Blacklist Channel** - Block completely
+• 📋 **View Lists** - Review all entries
+• 🗑️ **Remove Entry** - Clean up lists
+
+🚨 **Security Actions Available Below**
+        """
+        
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=BotKeyboards.channel_control(),
+            parse_mode="Markdown"
+        )
+        await callback_query.answer()

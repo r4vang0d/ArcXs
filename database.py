@@ -92,12 +92,43 @@ class DatabaseManager:
                 )
             """)
             
+            # Premium user settings table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS premium_settings (
+                    user_id INTEGER PRIMARY KEY,
+                    max_channels INTEGER DEFAULT 1,
+                    max_daily_boosts INTEGER DEFAULT 100,
+                    custom_limits TEXT,
+                    upgraded_by INTEGER,
+                    upgrade_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (id),
+                    FOREIGN KEY (upgraded_by) REFERENCES users (id)
+                )
+            """)
+            
+            # Channel whitelist/blacklist table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS channel_control (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_link TEXT UNIQUE NOT NULL,
+                    channel_id TEXT,
+                    status TEXT DEFAULT 'allowed',
+                    reason TEXT,
+                    added_by INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (added_by) REFERENCES users (id)
+                )
+            """)
+            
             # Create indexes for performance
             await db.execute("CREATE INDEX IF NOT EXISTS idx_users_premium ON users (premium)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts (status)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_channels_user ON channels (user_id)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_logs_type ON logs (type)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_logs_created ON logs (created_at)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_premium_settings_user ON premium_settings (user_id)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_channel_control_status ON channel_control (status)")
             
             await db.commit()
             logger.info("Database initialized successfully")
@@ -427,3 +458,162 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting user count: {e}")
             return 0
+    
+    # === Premium Management Methods ===
+    
+    async def upgrade_user_to_premium(self, user_id: int, admin_id: int, max_channels: int = None, max_daily_boosts: int = None, notes: str = None):
+        """Upgrade user to premium with custom limits"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            
+            # Update users table
+            await connection.execute(
+                "UPDATE users SET premium = TRUE WHERE id = ?",
+                (user_id,)
+            )
+            
+            # Insert or update premium settings
+            await connection.execute("""
+                INSERT OR REPLACE INTO premium_settings 
+                (user_id, max_channels, max_daily_boosts, upgraded_by, notes)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, max_channels or 999, max_daily_boosts or 9999, admin_id, notes))
+            
+            await connection.commit()
+            logger.info(f"User {user_id} upgraded to premium by admin {admin_id}")
+    
+    async def downgrade_user_from_premium(self, user_id: int, admin_id: int):
+        """Downgrade user from premium"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            
+            # Update users table
+            await connection.execute(
+                "UPDATE users SET premium = FALSE WHERE id = ?",
+                (user_id,)
+            )
+            
+            # Remove premium settings
+            await connection.execute(
+                "DELETE FROM premium_settings WHERE user_id = ?",
+                (user_id,)
+            )
+            
+            await connection.commit()
+            logger.info(f"User {user_id} downgraded from premium by admin {admin_id}")
+    
+    async def get_premium_users(self) -> List[Dict[str, Any]]:
+        """Get list of all premium users"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            cursor = await connection.execute("""
+                SELECT u.id, u.premium, u.created_at,
+                       ps.max_channels, ps.max_daily_boosts, ps.upgrade_date, ps.notes
+                FROM users u 
+                LEFT JOIN premium_settings ps ON u.id = ps.user_id
+                WHERE u.premium = TRUE
+                ORDER BY ps.upgrade_date DESC
+            """)
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    async def update_premium_limits(self, user_id: int, max_channels: int = None, max_daily_boosts: int = None):
+        """Update premium user limits"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            
+            updates = []
+            params = []
+            
+            if max_channels is not None:
+                updates.append("max_channels = ?")
+                params.append(max_channels)
+            
+            if max_daily_boosts is not None:
+                updates.append("max_daily_boosts = ?")
+                params.append(max_daily_boosts)
+            
+            if updates:
+                params.append(user_id)
+                await connection.execute(
+                    f"UPDATE premium_settings SET {', '.join(updates)} WHERE user_id = ?",
+                    params
+                )
+                await connection.commit()
+                logger.info(f"Updated premium limits for user {user_id}")
+    
+    # === Channel Control Methods ===
+    
+    async def add_channel_to_whitelist(self, channel_link: str, admin_id: int, reason: str = None):
+        """Add channel to whitelist"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            await connection.execute("""
+                INSERT OR REPLACE INTO channel_control 
+                (channel_link, status, reason, added_by)
+                VALUES (?, 'whitelisted', ?, ?)
+            """, (channel_link, reason, admin_id))
+            await connection.commit()
+            logger.info(f"Channel {channel_link} whitelisted by admin {admin_id}")
+    
+    async def add_channel_to_blacklist(self, channel_link: str, admin_id: int, reason: str = None):
+        """Add channel to blacklist"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            await connection.execute("""
+                INSERT OR REPLACE INTO channel_control 
+                (channel_link, status, reason, added_by)
+                VALUES (?, 'blacklisted', ?, ?)
+            """, (channel_link, reason, admin_id))
+            await connection.commit()
+            logger.info(f"Channel {channel_link} blacklisted by admin {admin_id}")
+    
+    async def get_channel_control_lists(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Get whitelist and blacklist"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            cursor = await connection.execute("""
+                SELECT channel_link, status, reason, added_by, created_at
+                FROM channel_control
+                ORDER BY created_at DESC
+            """)
+            rows = await cursor.fetchall()
+            
+            lists = {"whitelisted": [], "blacklisted": []}
+            for row in rows:
+                row_dict = dict(row)
+                if row_dict["status"] in lists:
+                    lists[row_dict["status"]].append(row_dict)
+            
+            return lists
+    
+    async def remove_from_channel_control(self, channel_link: str):
+        """Remove channel from control lists"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            await connection.execute(
+                "DELETE FROM channel_control WHERE channel_link = ?",
+                (channel_link,)
+            )
+            await connection.commit()
+            logger.info(f"Channel {channel_link} removed from control lists")
+    
+    async def is_channel_allowed(self, channel_link: str) -> bool:
+        """Check if channel is allowed (not blacklisted)"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            cursor = await connection.execute(
+                "SELECT status FROM channel_control WHERE channel_link = ?",
+                (channel_link,)
+            )
+            row = await cursor.fetchone()
+            
+            if row:
+                return row[0] != "blacklisted"
+            return True  # Allow by default if not in control list
+    
+    async def close(self):
+        """Close database connection"""
+        if self._connection:
+            await self._connection.close()
+            self._connection = None
