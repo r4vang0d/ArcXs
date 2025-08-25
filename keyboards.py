@@ -15,15 +15,15 @@ class BotKeyboards:
         
         if is_admin:
             buttons = [
-                [InlineKeyboardButton(text="👥 User Panel", callback_data="user_panel")],
-                [InlineKeyboardButton(text="🔧 Admin Panel", callback_data="admin_panel")],
+                [InlineKeyboardButton(text="👤 User Panel", callback_data="user_panel")],
+                [InlineKeyboardButton(text="🛠 Admin Panel", callback_data="admin_panel")],
             ]
         else:
             buttons = [
-                [InlineKeyboardButton(text="➕ Add Channel", callback_data="add_channel")],
-                [InlineKeyboardButton(text="📊 My Stats", callback_data="my_stats")],
-                [InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views")],
-                [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
+                [InlineKeyboardButton(text="📢 Add Channel", callback_data="add_channel"),
+                 InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views")],
+                [InlineKeyboardButton(text="📈 My Stats", callback_data="my_stats"),
+                 InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
             ]
         
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -32,10 +32,10 @@ class BotKeyboards:
     def user_panel() -> InlineKeyboardMarkup:
         """User panel keyboard"""
         buttons = [
-            [InlineKeyboardButton(text="➕ Add Channel", callback_data="add_channel")],
-            [InlineKeyboardButton(text="📋 My Channels", callback_data="my_channels")],
-            [InlineKeyboardButton(text="📊 My Stats", callback_data="my_stats")],
-            [InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views")],
+            [InlineKeyboardButton(text="📢 Add Channel", callback_data="add_channel"),
+             InlineKeyboardButton(text="📋 My Channels", callback_data="my_channels")],
+            [InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views"),
+             InlineKeyboardButton(text="📈 My Stats", callback_data="my_stats")],
             [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
@@ -45,12 +45,12 @@ class BotKeyboards:
     def admin_panel() -> InlineKeyboardMarkup:
         """Admin panel keyboard"""
         buttons = [
-            [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts")],
-            [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
-            [InlineKeyboardButton(text="❌ Failed Operations", callback_data="admin_failed")],
-            [InlineKeyboardButton(text="🚫 Banned Accounts", callback_data="admin_banned")],
-            [InlineKeyboardButton(text="⚡ Account Health", callback_data="admin_health")],
-            [InlineKeyboardButton(text="👥 User Stats", callback_data="admin_users")],
+            [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
+             InlineKeyboardButton(text="💚 Account Health", callback_data="admin_health")],
+            [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs"),
+             InlineKeyboardButton(text="👥 User Stats", callback_data="admin_users")],
+            [InlineKeyboardButton(text="⚠️ Failed Operations", callback_data="admin_failed"),
+             InlineKeyboardButton(text="🚫 Banned Accounts", callback_data="admin_banned")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -59,10 +59,10 @@ class BotKeyboards:
     def account_management() -> InlineKeyboardMarkup:
         """Account management keyboard"""
         buttons = [
-            [InlineKeyboardButton(text="➕ Add Account", callback_data="add_account")],
-            [InlineKeyboardButton(text="📋 List Accounts", callback_data="list_accounts")],
-            [InlineKeyboardButton(text="🗑️ Remove Account", callback_data="remove_account")],
-            [InlineKeyboardButton(text="🔄 Refresh Status", callback_data="refresh_accounts")],
+            [InlineKeyboardButton(text="➕ Add Account", callback_data="add_account"),
+             InlineKeyboardButton(text="📋 List Accounts", callback_data="list_accounts")],
+            [InlineKeyboardButton(text="🗑️ Remove Account", callback_data="remove_account"),
+             InlineKeyboardButton(text="🔄 Refresh Status", callback_data="refresh_accounts")],
             [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -112,10 +112,10 @@ class BotKeyboards:
     def settings_menu() -> InlineKeyboardMarkup:
         """Settings configuration menu"""
         buttons = [
-            [InlineKeyboardButton(text="👁️ Views Only", callback_data="setting_views_only")],
-            [InlineKeyboardButton(text="👁️📖 Views + Read", callback_data="setting_views_read")],
-            [InlineKeyboardButton(text="🔄 Account Rotation", callback_data="setting_rotation")],
-            [InlineKeyboardButton(text="⏱️ Boost Delay", callback_data="setting_delay")],
+            [InlineKeyboardButton(text="👁️ Views Only", callback_data="setting_views_only"),
+             InlineKeyboardButton(text="👁️📖 Views + Read", callback_data="setting_views_read")],
+            [InlineKeyboardButton(text="🔄 Account Rotation", callback_data="setting_rotation"),
+             InlineKeyboardButton(text="⏱️ Boost Delay", callback_data="setting_delay")],
             [InlineKeyboardButton(text="🔙 User Panel", callback_data="user_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -124,9 +124,9 @@ class BotKeyboards:
     def delay_settings() -> InlineKeyboardMarkup:
         """Delay configuration options"""
         buttons = [
-            [InlineKeyboardButton(text="🐇 Low (1-2s)", callback_data="delay_low")],
-            [InlineKeyboardButton(text="🚶 Medium (2-5s)", callback_data="delay_medium")],
-            [InlineKeyboardButton(text="🐢 High (5-10s)", callback_data="delay_high")],
+            [InlineKeyboardButton(text="🐇 Fast (1-2s)", callback_data="delay_low"),
+             InlineKeyboardButton(text="🚶 Medium (2-5s)", callback_data="delay_medium")],
+            [InlineKeyboardButton(text="🐢 Safe (5-10s)", callback_data="delay_high")],
             [InlineKeyboardButton(text="🔙 Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -195,12 +195,12 @@ class BotKeyboards:
     def log_types() -> InlineKeyboardMarkup:
         """Log filtering options"""
         buttons = [
-            [InlineKeyboardButton(text="📥 All Logs", callback_data="logs_all")],
-            [InlineKeyboardButton(text="🔗 Joins", callback_data="logs_join")],
-            [InlineKeyboardButton(text="⚡ Boosts", callback_data="logs_boost")],
-            [InlineKeyboardButton(text="❌ Errors", callback_data="logs_error")],
-            [InlineKeyboardButton(text="🚫 Bans", callback_data="logs_ban")],
-            [InlineKeyboardButton(text="⏳ Flood Waits", callback_data="logs_flood_wait")],
+            [InlineKeyboardButton(text="📊 All Logs", callback_data="logs_all"),
+             InlineKeyboardButton(text="⚡ Boosts", callback_data="logs_boost")],
+            [InlineKeyboardButton(text="🔗 Joins", callback_data="logs_join"),
+             InlineKeyboardButton(text="⚠️ Errors", callback_data="logs_error")],
+            [InlineKeyboardButton(text="🚫 Bans", callback_data="logs_ban"),
+             InlineKeyboardButton(text="⏳ Flood Waits", callback_data="logs_flood_wait")],
             [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)

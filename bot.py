@@ -66,19 +66,20 @@ class ViewBoosterBot:
         is_admin = self.config.is_admin(user_id)
         
         welcome_text = f"""
-🚀 **Welcome to View Booster Bot!**
+🎯 **Welcome to View Booster Bot!**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Hello {message.from_user.first_name}! 
+👋 Hello **{message.from_user.first_name}**! 
 
-This bot helps you manage Telegram channels and boost views using multiple accounts.
+🚀 This bot helps you manage Telegram channels and boost views using multiple accounts with advanced automation.
 
-{'🔧 **Admin Features:**' if is_admin else '👤 **User Features:**'}
-{'• Manage Telethon accounts' if is_admin else '• Add channels for boosting'}
-{'• Monitor system health' if is_admin else '• Boost channel views'}
-{'• View detailed logs' if is_admin else '• Track your statistics'}
-{'• User management' if is_admin else '• Configure settings'}
+{'🛠 **Admin Features Available:**' if is_admin else '⭐ **Features Available:**'}
+{'📱 Manage Telethon accounts' if is_admin else '📢 Add channels for boosting'}
+{'💚 Monitor system health' if is_admin else '⚡ Boost channel views instantly'}
+{'📊 View detailed logs & analytics' if is_admin else '📈 Track your statistics'}
+{'👥 User management dashboard' if is_admin else '⚙️ Configure boost settings'}
 
-{'Choose an option below:' if is_admin else 'Get started by adding a channel!'}
+{'🎛 Choose your panel below:' if is_admin else '🚀 Ready to boost your views?'}
         """
         
         await message.answer(
@@ -90,31 +91,40 @@ This bot helps you manage Telegram channels and boost views using multiple accou
     async def help_command(self, message: types.Message):
         """Handle /help command"""
         help_text = """
-📚 **Bot Commands:**
+📚 **Bot Help & Commands**
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/start - Start the bot and show main menu
-/help - Show this help message
-/stats - Show your statistics
+🤖 **Available Commands:**
+• `/start` - Launch bot and main menu
+• `/help` - Show this help guide
+• `/stats` - View your statistics
 
-🔧 **How to use:**
+🎯 **How to Use:**
 
-1️⃣ **Add Channel**: Use the "Add Channel" button to add channels you want to boost
-2️⃣ **Boost Views**: Select a channel and boost its message views
-3️⃣ **Settings**: Customize boost behavior and delays
-4️⃣ **Stats**: Track your boost history and results
+**1️⃣ Add Channel**
+📢 Use "Add Channel" to add channels for boosting
 
-📱 **Supported Links:**
-• https://t.me/channel_name
-• https://t.me/joinchat/invite_code
-• @channel_name
-• channel_name
+**2️⃣ Boost Views** 
+⚡ Select channel and boost message views instantly
 
-⚙️ **Settings Options:**
-• Views Only vs Views + Read
-• Account Rotation ON/OFF
-• Delay levels (Low/Medium/High)
+**3️⃣ Configure Settings**
+⚙️ Customize boost behavior and timing
 
-❓ Need help? Contact the bot administrator.
+**4️⃣ Track Results**
+📈 Monitor your boost history and statistics
+
+📱 **Supported Link Formats:**
+• `https://t.me/channel_name`
+• `https://t.me/joinchat/invite_code`
+• `@channel_name`
+• `channel_name`
+
+⚙️ **Advanced Settings:**
+• 👁️ Views Only vs 👁️📖 Views + Read
+• 🔄 Account Rotation ON/OFF
+• ⏱️ Delay levels (🐇 Fast / 🚶 Medium / 🐢 Safe)
+
+💡 **Need Support?** Contact the bot administrator.
         """
         
         await message.answer(help_text, parse_mode="Markdown")

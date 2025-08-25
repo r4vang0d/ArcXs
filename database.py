@@ -29,7 +29,6 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = "bot_data.db"):
         self.db_path = db_path
-        self._connection_pool = []
         self._lock = asyncio.Lock()
     
     async def init_db(self):
