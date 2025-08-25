@@ -76,6 +76,7 @@ class AdminHandler:
         elif data.startswith("account_details:"):
             await self.show_account_details(callback_query, data)
         else:
+            logger.warning(f"Unknown admin callback: {data}")
             await callback_query.answer("Unknown command")
     
     async def handle_message(self, message: types.Message, state: FSMContext):
@@ -603,11 +604,12 @@ Choose log type to view:
 • Flood Waits - Rate limiting events
         """
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.log_types(),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.log_types(),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_filtered_logs(self, callback_query: types.CallbackQuery, data: str):
