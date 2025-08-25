@@ -633,7 +633,14 @@ Choose log type to view:
             for log in logs:
                 timestamp = Utils.format_datetime(log["created_at"])
                 message = Utils.escape_markdown(log["message"] or "No message")
-                account = f" | {log['account_phone']}" if log["account_phone"] else ""
+                # Use username if available, otherwise phone
+                if log.get("account_username"):
+                    account_display = f"@{log['account_username']}" if not log['account_username'].startswith('@') else log['account_username']
+                    account = f" | {account_display}"
+                elif log.get("account_phone"):
+                    account = f" | {log['account_phone']}"
+                else:
+                    account = ""
                 
                 text += f"🕐 {timestamp}\n"
                 text += f"📝 {message}{account}\n\n"
@@ -658,7 +665,13 @@ Choose log type to view:
             for log in error_logs:
                 timestamp = Utils.format_datetime(log["created_at"])
                 message = Utils.escape_markdown(log["message"] or "Unknown error")
-                account = log["account_phone"] or "Unknown account"
+                # Use username if available, otherwise phone
+                if log.get("account_username"):
+                    account = f"@{log['account_username']}" if not log['account_username'].startswith('@') else log['account_username']
+                elif log.get("account_phone"):
+                    account = log["account_phone"]
+                else:
+                    account = "Unknown account"
                 
                 text += f"🕐 {timestamp}\n"
                 text += f"📱 {account}\n"

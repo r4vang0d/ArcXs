@@ -423,6 +423,7 @@ class DatabaseManager:
             query = """
                 SELECT l.id, l.type, l.message, l.created_at,
                        a.phone as account_phone,
+                       a.username as account_username,
                        c.channel_link,
                        l.user_id
                 FROM logs l
@@ -449,8 +450,9 @@ class DatabaseManager:
                             "message": row[2],
                             "created_at": row[3],
                             "account_phone": row[4],
-                            "channel_link": row[5],
-                            "user_id": row[6]
+                            "account_username": row[5],
+                            "channel_link": row[6],
+                            "user_id": row[7]
                         }
                         for row in rows
                     ]
