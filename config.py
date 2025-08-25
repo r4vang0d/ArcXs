@@ -6,7 +6,7 @@ from typing import List
 from dotenv import load_dotenv
 
 # Load environment variables (optional for .env file)
-load_dotenv(verbose=False)
+load_dotenv('.env', verbose=True)
 
 class Config:
     """Configuration class for bot settings"""
