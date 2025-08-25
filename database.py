@@ -265,14 +265,13 @@ class DatabaseManager:
                                   flood_wait_until: Optional[datetime] = None) -> bool:
         """Update account status"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    UPDATE accounts 
-                    SET status = ?, flood_wait_until = ?, last_used = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (status.value, flood_wait_until, account_id))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                UPDATE accounts 
+                SET status = ?, flood_wait_until = ?, last_used = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (status.value, flood_wait_until, account_id))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error updating account {account_id} status: {e}")
             return False
@@ -280,14 +279,13 @@ class DatabaseManager:
     async def increment_failed_attempts(self, account_id: int) -> bool:
         """Increment failed attempts counter for an account"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    UPDATE accounts 
-                    SET failed_attempts = failed_attempts + 1, last_used = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """, (account_id,))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                UPDATE accounts 
+                SET failed_attempts = failed_attempts + 1, last_used = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (account_id,))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error incrementing failed attempts for account {account_id}: {e}")
             return False
@@ -296,13 +294,12 @@ class DatabaseManager:
     async def add_channel(self, user_id: int, channel_link: str, channel_id: Optional[str] = None, title: Optional[str] = None) -> bool:
         """Add a channel for a user"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    INSERT INTO channels (user_id, channel_link, channel_id, title)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, channel_link, channel_id, title))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                INSERT INTO channels (user_id, channel_link, channel_id, title)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, channel_link, channel_id, title))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error adding channel {channel_link} for user {user_id}: {e}")
             return False
@@ -310,8 +307,9 @@ class DatabaseManager:
     async def get_user_channels(self, user_id: int) -> List[Dict[str, Any]]:
         """Get all channels for a user"""
         try:
-            async with await self.get_connection() as db:
-                async with db.execute("""
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
                     SELECT id, channel_link, channel_id, title, member_count,
                            created_at, last_boosted, total_boosts
                     FROM channels WHERE user_id = ?
@@ -338,15 +336,14 @@ class DatabaseManager:
     async def update_channel_boost(self, channel_id: int, boost_count: int = 1) -> bool:
         """Update channel boost statistics"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    UPDATE channels 
-                    SET last_boosted = CURRENT_TIMESTAMP, 
-                        total_boosts = total_boosts + ?
-                    WHERE id = ?
-                """, (boost_count, channel_id))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                UPDATE channels 
+                SET last_boosted = CURRENT_TIMESTAMP, 
+                    total_boosts = total_boosts + ?
+                WHERE id = ?
+            """, (boost_count, channel_id))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error updating channel {channel_id} boost: {e}")
             return False
@@ -354,12 +351,11 @@ class DatabaseManager:
     async def remove_channel(self, channel_id: int, user_id: int) -> bool:
         """Remove a channel (only by the owner)"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    DELETE FROM channels WHERE id = ? AND user_id = ?
-                """, (channel_id, user_id))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                DELETE FROM channels WHERE id = ? AND user_id = ?
+            """, (channel_id, user_id))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error removing channel {channel_id}: {e}")
             return False
@@ -400,8 +396,9 @@ class DatabaseManager:
             query += " ORDER BY l.created_at DESC LIMIT ?"
             params.append(limit)
             
-            async with await self.get_connection() as db:
-                async with db.execute(query, params) as cursor:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute(query, params) as cursor:
                     rows = await cursor.fetchall()
                     return [
                         {
