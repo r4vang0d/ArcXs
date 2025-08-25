@@ -612,6 +612,89 @@ class TelethonManager:
         except Exception as e:
             logger.error(f"Error updating account usernames: {e}")
     
+    async def check_channel_for_live_stream(self, channel_link: str) -> bool:
+        """Check if a channel currently has live streams"""
+        if not self.active_clients:
+            return False
+        
+        try:
+            client = self.clients[self.active_clients[0]]
+            entity = await client.get_entity(channel_link)
+            
+            # Get recent messages to check for live streams
+            messages = await client.get_messages(entity, limit=5)
+            
+            for message in messages:
+                # Check if message has live stream or video call
+                if (message.media and hasattr(message.media, 'grouped_id') and 
+                    hasattr(message, 'action') and 
+                    message.action and 
+                    'video_chat' in str(type(message.action)).lower()):
+                    return True
+                
+                # Check if message text indicates live stream
+                if message.text:
+                    live_keywords = ['live stream', 'live streaming', 'going live', 'live now', '🔴', 'live video']
+                    text_lower = message.text.lower()
+                    if any(keyword in text_lower for keyword in live_keywords):
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking live stream for {channel_link}: {e}")
+            return False
+    
+    async def join_live_stream(self, channel_link: str) -> Dict[str, Any]:
+        """Join live stream with all available accounts"""
+        if not self.active_clients:
+            return {"success": False, "message": "No active accounts", "accounts_joined": 0}
+        
+        accounts_joined = 0
+        failed_accounts = []
+        
+        try:
+            for session_name in self.active_clients:
+                try:
+                    client = self.clients[session_name]
+                    entity = await client.get_entity(channel_link)
+                    
+                    # Join the channel if not already joined
+                    try:
+                        await client(JoinChannelRequest(entity))
+                        accounts_joined += 1
+                        logger.info(f"Account {session_name} joined live stream in {channel_link}")
+                        
+                        # Add small delay between joins
+                        await asyncio.sleep(1)
+                        
+                    except Exception as join_error:
+                        if "already a participant" in str(join_error).lower():
+                            accounts_joined += 1  # Already joined, count as success
+                        else:
+                            failed_accounts.append(session_name)
+                            logger.error(f"Failed to join live stream with {session_name}: {join_error}")
+                
+                except Exception as client_error:
+                    failed_accounts.append(session_name)
+                    logger.error(f"Error with client {session_name}: {client_error}")
+            
+            success = accounts_joined > 0
+            message = f"Joined live stream with {accounts_joined} accounts"
+            if failed_accounts:
+                message += f". Failed with {len(failed_accounts)} accounts"
+            
+            return {
+                "success": success,
+                "message": message,
+                "accounts_joined": accounts_joined,
+                "failed_accounts": failed_accounts
+            }
+            
+        except Exception as e:
+            logger.error(f"Error joining live stream: {e}")
+            return {"success": False, "message": f"Error: {e}", "accounts_joined": 0}
+
     async def cleanup(self):
         """Cleanup all clients on shutdown"""
         for client in self.clients.values():

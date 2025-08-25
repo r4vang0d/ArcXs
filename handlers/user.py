@@ -24,6 +24,7 @@ class UserStates(StatesGroup):
     waiting_for_channel = State()
     waiting_for_message_ids = State()
     waiting_for_reaction_message_ids = State()
+    waiting_for_live_channel = State()
 
 class UserHandler:
     """Handles user-specific operations"""
@@ -62,6 +63,18 @@ class UserHandler:
             await self.show_emoji_reactions_menu(callback_query)
         elif data == "settings":
             await self.show_settings(callback_query)
+        elif data == "live_management":
+            await self.show_live_management(callback_query)
+        elif data == "add_live_channel":
+            await self.start_add_live_channel(callback_query, state)
+        elif data == "view_live_channels":
+            await self.show_live_channels(callback_query)
+        elif data == "live_monitor_status":
+            await self.show_live_monitor_status(callback_query)
+        elif data.startswith("live_channel_info:"):
+            await self.show_live_channel_info(callback_query, data)
+        elif data.startswith("remove_live_channel:"):
+            await self.confirm_remove_live_channel(callback_query, data)
         elif data.startswith("channel_info:"):
             await self.show_channel_info(callback_query, data)
         elif data.startswith("remove_channel:"):
@@ -97,6 +110,8 @@ class UserHandler:
                 await self.process_boost_messages(message, state)
             elif current_state == UserStates.waiting_for_reaction_message_ids.state:
                 await self.process_reaction_messages(message, state)
+            elif current_state == UserStates.waiting_for_live_channel.state:
+                await self.process_live_channel(message, state)
             else:
                 logger.info(f"No handler for state: {current_state}")
         except Exception as e:
@@ -1215,3 +1230,260 @@ Last Boosted: {last_boosted}
             else:
                 logger.error(f"Error editing message: {e}")
                 raise e
+    
+    # Live Management Methods
+    async def show_live_management(self, callback_query: types.CallbackQuery):
+        """Show live management menu"""
+        await callback_query.answer()
+        
+        monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+        active_count = len([m for m in monitors if m.get('active', False)])
+        total_count = len(monitors)
+        
+        text = f"""🔴 **Live Stream Management**
+
+📊 **Status Overview:**
+• Total Monitored: {total_count} channels
+• Active Monitoring: {active_count} channels
+
+⚡ **How it works:**
+The bot continuously monitors your selected channels for live streams and automatically joins them with all available accounts when detected.
+
+🎯 **Features:**
+• Add multiple channels to monitor
+• Auto-join live streams with all accounts
+• Real-time monitoring status
+• Professional live stream detection"""
+
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.live_management()
+        )
+    
+    async def start_add_live_channel(self, callback_query: types.CallbackQuery, state: FSMContext):
+        """Start adding a channel for live monitoring"""
+        await callback_query.answer()
+        await state.set_state(UserStates.waiting_for_live_channel)
+        
+        text = """➕ **Add Channel for Live Monitoring**
+
+Please send the channel link you want to monitor for live streams.
+
+**Supported formats:**
+• `https://t.me/channel_name`
+• `@channel_name`
+• `t.me/channel_name`
+
+The bot will automatically detect when this channel goes live and join the stream with all your accounts.
+
+Type `/cancel` to cancel."""
+
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.cancel_operation()
+        )
+    
+    async def process_live_channel(self, message: types.Message, state: FSMContext):
+        """Process live channel addition"""
+        if not message.from_user or not message.text:
+            return
+        
+        user_id = message.from_user.id
+        channel_input = message.text.strip()
+        
+        if channel_input == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled",
+                               reply_markup=BotKeyboards.main_menu(True))
+            return
+        
+        # Validate channel link
+        is_valid, channel_link, error_msg = Utils.validate_channel_link(channel_input)
+        if not is_valid:
+            await message.answer(f"❌ {error_msg}")
+            return
+        
+        # Get channel info using Telethon
+        processing_msg = await message.answer("🔍 Checking channel...")
+        
+        try:
+            channel_info = await self.telethon.get_channel_info(channel_link)
+            if not channel_info:
+                await processing_msg.edit_text("❌ Could not access channel. Make sure the link is correct and the channel is public.")
+                return
+            
+            # Add to live monitoring
+            success = await self.db.add_live_monitor(
+                user_id, 
+                channel_link, 
+                channel_info.get("title")
+            )
+            
+            if success:
+                await processing_msg.edit_text(
+                    f"✅ **Channel Added to Live Monitoring**\n\n"
+                    f"📢 **Channel:** {channel_info.get('title', 'Unknown')}\n"
+                    f"🔗 **Link:** {channel_link}\n"
+                    f"🔴 **Status:** Active monitoring\n\n"
+                    f"The bot will now monitor this channel for live streams and automatically join them with all your accounts.",
+                    reply_markup=BotKeyboards.live_management()
+                )
+            else:
+                await processing_msg.edit_text("❌ Failed to add channel to monitoring. Please try again.")
+            
+        except Exception as e:
+            logger.error(f"Error adding live monitor: {e}")
+            await processing_msg.edit_text("❌ Error processing channel. Please try again.")
+        
+        await state.clear()
+    
+    async def show_live_channels(self, callback_query: types.CallbackQuery):
+        """Show list of monitored live channels"""
+        await callback_query.answer()
+        
+        monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+        
+        if not monitors:
+            text = """📋 **Monitored Live Channels**
+
+🔍 **No channels being monitored**
+
+You haven't added any channels for live monitoring yet. Click "Add Monitor Channel" to start monitoring channels for live streams.
+
+💡 **Tip:** The bot will automatically join live streams with all your accounts when detected."""
+        else:
+            text = f"📋 **Monitored Live Channels** ({len(monitors)})\n\n"
+            
+            for monitor in monitors:
+                title = monitor.get('title') or 'Unknown Channel'
+                status = "🔴 Active" if monitor.get('active', False) else "⚫ Inactive"
+                live_count = monitor.get('live_count', 0)
+                last_checked = monitor.get('last_checked', 'Never')
+                
+                text += f"**{title}**\n"
+                text += f"Status: {status}\n"
+                text += f"Lives Joined: {live_count}\n"
+                text += f"Last Check: {last_checked}\n\n"
+        
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.live_channel_list(monitors)
+        )
+    
+    async def show_live_monitor_status(self, callback_query: types.CallbackQuery):
+        """Show live monitoring system status"""
+        await callback_query.answer()
+        
+        monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+        all_monitors = await self.db.get_all_active_monitors()
+        active_accounts = await self.telethon.get_active_account_count()
+        
+        active_user_monitors = len([m for m in monitors if m.get('active', False)])
+        total_user_monitors = len(monitors)
+        total_system_monitors = len(all_monitors)
+        
+        text = f"""⚡ **Live Monitor Status**
+
+👤 **Your Monitoring:**
+• Active: {active_user_monitors}/{total_user_monitors} channels
+• Total Lives Joined: {sum(m.get('live_count', 0) for m in monitors)}
+
+🌐 **System Status:**
+• Total Active Monitors: {total_system_monitors}
+• Available Accounts: {active_accounts}
+
+🔄 **Monitoring Process:**
+• Continuous scanning for live streams
+• Automatic joining with all accounts
+• Real-time status updates
+
+💡 **Performance:**
+The system checks for live streams every 30 seconds across all monitored channels."""
+
+        await self.safe_edit_message(
+            callback_query,
+            text,
+            reply_markup=BotKeyboards.live_management()
+        )
+    
+    async def show_live_channel_info(self, callback_query: types.CallbackQuery, data: str):
+        """Show detailed info for a specific monitored channel"""
+        await callback_query.answer()
+        
+        try:
+            monitor_id = int(data.split(":")[1])
+            monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+            
+            monitor = next((m for m in monitors if m['id'] == monitor_id), None)
+            if not monitor:
+                await callback_query.answer("Channel not found", show_alert=True)
+                return
+            
+            title = monitor.get('title') or 'Unknown Channel'
+            status = "🔴 Active" if monitor.get('active', False) else "⚫ Inactive"
+            live_count = monitor.get('live_count', 0)
+            last_checked = monitor.get('last_checked', 'Never')
+            created_at = monitor.get('created_at', 'Unknown')
+            
+            text = f"""📊 **Channel Details**
+
+📢 **Channel:** {title}
+🔗 **Link:** {monitor['channel_link']}
+🔴 **Status:** {status}
+
+📈 **Statistics:**
+• Lives Joined: {live_count}
+• Last Checked: {last_checked}
+• Added: {created_at}
+
+⚙️ **Actions:**
+Use the buttons below to manage this channel."""
+            
+            buttons = [
+                [InlineKeyboardButton(
+                    text="⏹️ Stop Monitoring" if monitor.get('active', False) else "▶️ Start Monitoring",
+                    callback_data=f"toggle_live_monitor:{monitor_id}"
+                )],
+                [InlineKeyboardButton(text="🗑️ Remove", callback_data=f"remove_live_channel:{monitor_id}")],
+                [InlineKeyboardButton(text="🔙 Back", callback_data="view_live_channels")]
+            ]
+            
+            await self.safe_edit_message(
+                callback_query,
+                text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+            )
+            
+        except (ValueError, IndexError):
+            await callback_query.answer("Invalid channel ID", show_alert=True)
+    
+    async def confirm_remove_live_channel(self, callback_query: types.CallbackQuery, data: str):
+        """Confirm removal of live monitoring channel"""
+        await callback_query.answer()
+        
+        try:
+            monitor_id = int(data.split(":")[1])
+            monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+            
+            monitor = next((m for m in monitors if m['id'] == monitor_id), None)
+            if not monitor:
+                await callback_query.answer("Channel not found", show_alert=True)
+                return
+            
+            success = await self.db.remove_live_monitor(callback_query.from_user.id, monitor_id)
+            
+            if success:
+                title = monitor.get('title') or 'Channel'
+                await self.safe_edit_message(
+                    callback_query,
+                    f"✅ **{title}** has been removed from live monitoring.",
+                    reply_markup=BotKeyboards.live_management()
+                )
+            else:
+                await callback_query.answer("Failed to remove channel", show_alert=True)
+            
+        except (ValueError, IndexError):
+            await callback_query.answer("Invalid channel ID", show_alert=True)

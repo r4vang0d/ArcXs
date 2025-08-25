@@ -129,6 +129,22 @@ class DatabaseManager:
                 )
             """)
             
+            # Live monitoring table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS live_monitoring (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    channel_link TEXT NOT NULL,
+                    channel_id TEXT,
+                    title TEXT,
+                    active BOOLEAN DEFAULT TRUE,
+                    last_checked DATETIME,
+                    live_count INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )
+            """)
+            
             # Create indexes for performance
             await db.execute("CREATE INDEX IF NOT EXISTS idx_users_premium ON users (premium)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_accounts_status ON accounts (status)")
@@ -137,6 +153,8 @@ class DatabaseManager:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_logs_created ON logs (created_at)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_premium_settings_user ON premium_settings (user_id)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_channel_control_status ON channel_control (status)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_live_monitoring_user ON live_monitoring (user_id)")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_live_monitoring_active ON live_monitoring (active)")
             
             await db.commit()
             logger.info("Database initialized successfully")
@@ -590,6 +608,100 @@ class DatabaseManager:
             if row:
                 return row[0] != "blacklisted"
             return True  # Allow by default if not in control list
+    
+    # Live monitoring methods
+    async def add_live_monitor(self, user_id: int, channel_link: str, title: str = None) -> bool:
+        """Add a channel to live monitoring"""
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                await connection.execute("""
+                    INSERT OR REPLACE INTO live_monitoring 
+                    (user_id, channel_link, title, active, created_at)
+                    VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP)
+                """, (user_id, channel_link, title))
+                await connection.commit()
+                logger.info(f"Added live monitor for channel {channel_link} by user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error adding live monitor: {e}")
+            return False
+    
+    async def get_live_monitors(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all live monitoring channels for a user"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            cursor = await connection.execute("""
+                SELECT id, channel_link, title, active, last_checked, live_count, created_at
+                FROM live_monitoring
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            """, (user_id,))
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    async def get_all_active_monitors(self) -> List[Dict[str, Any]]:
+        """Get all active live monitoring channels"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            cursor = await connection.execute("""
+                SELECT id, user_id, channel_link, title, last_checked, live_count
+                FROM live_monitoring
+                WHERE active = TRUE
+                ORDER BY last_checked ASC
+            """)
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+    
+    async def update_live_monitor_check(self, monitor_id: int, live_detected: bool = False):
+        """Update last checked time and live count"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            if live_detected:
+                await connection.execute("""
+                    UPDATE live_monitoring 
+                    SET last_checked = CURRENT_TIMESTAMP, live_count = live_count + 1
+                    WHERE id = ?
+                """, (monitor_id,))
+            else:
+                await connection.execute("""
+                    UPDATE live_monitoring 
+                    SET last_checked = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (monitor_id,))
+            await connection.commit()
+    
+    async def remove_live_monitor(self, user_id: int, monitor_id: int) -> bool:
+        """Remove a live monitoring channel"""
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                await connection.execute("""
+                    DELETE FROM live_monitoring 
+                    WHERE id = ? AND user_id = ?
+                """, (monitor_id, user_id))
+                await connection.commit()
+                logger.info(f"Removed live monitor {monitor_id} for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error removing live monitor: {e}")
+            return False
+    
+    async def toggle_live_monitor(self, user_id: int, monitor_id: int, active: bool) -> bool:
+        """Toggle live monitoring on/off for a channel"""
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                await connection.execute("""
+                    UPDATE live_monitoring 
+                    SET active = ?
+                    WHERE id = ? AND user_id = ?
+                """, (active, monitor_id, user_id))
+                await connection.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error toggling live monitor: {e}")
+            return False
     
     async def close(self):
         """Close database connection"""

@@ -19,8 +19,9 @@ class BotKeyboards:
              InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats")],
             [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
              InlineKeyboardButton(text="💚 System Health", callback_data="admin_health")],
-            [InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs"),
-             InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
+            [InlineKeyboardButton(text="🔴 Live Management", callback_data="live_management"),
+             InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
+            [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
@@ -200,4 +201,50 @@ class BotKeyboards:
              InlineKeyboardButton(text="⏳ Flood Waits", callback_data="logs_flood_wait")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def live_management() -> InlineKeyboardMarkup:
+        """Live Management keyboard"""
+        buttons = [
+            [InlineKeyboardButton(text="➕ Add Monitor Channel", callback_data="add_live_channel"),
+             InlineKeyboardButton(text="📋 View Monitored", callback_data="view_live_channels")],
+            [InlineKeyboardButton(text="🗑️ Remove Channel", callback_data="remove_live_channel"),
+             InlineKeyboardButton(text="⚡ Monitor Status", callback_data="live_monitor_status")],
+            [InlineKeyboardButton(text="🔴 Start Monitoring", callback_data="start_live_monitor"),
+             InlineKeyboardButton(text="⏹️ Stop Monitoring", callback_data="stop_live_monitor")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def live_channel_list(channels: List[Dict[str, Any]]) -> InlineKeyboardMarkup:
+        """Generate keyboard for monitored live channels list"""
+        buttons = []
+        
+        for i, channel in enumerate(channels):
+            channel_name = channel.get("title") or channel["channel_link"]
+            if len(channel_name) > 25:
+                channel_name = channel_name[:22] + "..."
+            
+            status_emoji = "🔴" if channel.get("active", False) else "⚫"
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"{status_emoji} {channel_name}",
+                    callback_data=f"live_channel_info:{channel['id']}"
+                ),
+                InlineKeyboardButton(
+                    text="🗑️",
+                    callback_data=f"remove_live_channel:{channel['id']}"
+                )
+            ])
+        
+        if not channels:
+            buttons.append([
+                InlineKeyboardButton(text="➕ Add Your First Monitor Channel", callback_data="add_live_channel")
+            ])
+        
+        buttons.append([
+            InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
+        ])
         return InlineKeyboardMarkup(inline_keyboard=buttons)

@@ -16,6 +16,7 @@ from session_manager import TelethonManager
 from inline_keyboards import BotKeyboards
 from handlers.admin import AdminHandler
 from handlers.user import UserHandler
+from live_monitor_service import LiveMonitorService
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ class ViewBoosterBot:
         # Initialize handlers
         self.admin_handler = AdminHandler(config, db_manager, self.telethon_manager)
         self.user_handler = UserHandler(config, db_manager, self.telethon_manager)
+        
+        # Initialize live monitoring service
+        self.live_monitor = LiveMonitorService(db_manager, self.telethon_manager)
         
         # Pass bot instance to handlers
         self.admin_handler.bot = self.bot
@@ -257,6 +261,9 @@ class ViewBoosterBot:
             # Load existing Telethon sessions
             await self.telethon_manager.load_existing_sessions()
             
+            # Start live monitoring service
+            await self.live_monitor.start_monitoring()
+            
             # Start polling
             logger.info("Bot started successfully!")
             await self.dp.start_polling(self.bot)
@@ -273,6 +280,8 @@ class ViewBoosterBot:
         logger.info("Shutting down bot...")
         
         try:
+            # Stop live monitoring service
+            await self.live_monitor.stop_monitoring()
             await self.telethon_manager.cleanup()
             await self.bot.session.close()
         except Exception as e:
