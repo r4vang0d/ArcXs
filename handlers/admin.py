@@ -26,8 +26,7 @@ class AdminStates(StatesGroup):
     waiting_for_custom_api_id = State()
     waiting_for_custom_api_hash = State()
     waiting_for_verification_code = State()
-    waiting_for_premium_user_id = State()
-    waiting_for_premium_limits = State()
+    # Premium states removed for personal use
     waiting_for_channel_link = State()
     waiting_for_channel_reason = State()
     waiting_for_remove_channel = State()
@@ -60,10 +59,7 @@ class AdminHandler:
             await self.show_banned_accounts(callback_query)
         elif data == "admin_health":
             await self.show_account_health(callback_query)
-        elif data == "admin_users":
-            await self.show_user_stats(callback_query)
-        elif data == "admin_premium":
-            await self.show_premium_management(callback_query)
+        # User stats and premium management removed for personal use
         elif data == "admin_channel_control":
             await self.show_channel_control(callback_query)
         elif data == "add_account":
@@ -80,14 +76,7 @@ class AdminHandler:
             await self.use_custom_api(callback_query, state)
         elif data == "cancel_operation":
             await self.cancel_operation(callback_query, state)
-        elif data == "premium_upgrade":
-            await self.start_premium_upgrade(callback_query, state)
-        elif data == "premium_downgrade":
-            await self.start_premium_downgrade(callback_query, state)
-        elif data == "premium_limits":
-            await self.start_premium_limits(callback_query, state)
-        elif data == "premium_list":
-            await self.show_premium_list(callback_query)
+        # Premium management callbacks removed for personal use
         elif data == "channel_whitelist":
             await self.start_channel_whitelist(callback_query, state)
         elif data == "channel_blacklist":
@@ -118,10 +107,7 @@ class AdminHandler:
             await self.process_custom_api_hash(message, state)
         elif current_state == AdminStates.waiting_for_verification_code.state:
             await self.process_verification_code(message, state)
-        elif current_state == AdminStates.waiting_for_premium_user_id.state:
-            await self.process_premium_user_id(message, state)
-        elif current_state == AdminStates.waiting_for_premium_limits.state:
-            await self.process_premium_limits(message, state)
+        # Premium management states removed for personal use
         elif current_state == AdminStates.waiting_for_channel_link.state:
             await self.process_channel_link(message, state)
         elif current_state == AdminStates.waiting_for_channel_reason.state:
@@ -776,36 +762,7 @@ Health Score: {health_percentage:.1f}%
         )
         await callback_query.answer()
     
-    async def show_user_stats(self, callback_query: types.CallbackQuery):
-        """Show user statistics"""
-        user_count = await self.db.get_user_count()
-        
-        # Get recent logs to show activity
-        recent_logs = await self.db.get_logs(limit=5)
-        
-        text = f"""
-👥 **User Statistics**
-
-📊 **Overview:**
-Total Users: {user_count}
-
-🔄 **Recent Activity:**
-        """
-        
-        if recent_logs:
-            for log in recent_logs:
-                timestamp = Utils.format_datetime(log["created_at"])
-                message = log["message"] or "Activity"
-                text += f"🕐 {timestamp}: {Utils.truncate_text(message)}\n"
-        else:
-            text += "No recent activity"
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.back_button("admin_panel"),
-            parse_mode="Markdown"
-        )
-        await callback_query.answer()
+    # User stats removed for personal use
     
     async def show_account_details(self, callback_query: types.CallbackQuery, data: str):
         """Show detailed account information"""
@@ -850,37 +807,7 @@ Use the account management menu to add/remove accounts.
             logger.error(f"Error showing account details: {e}")
             await callback_query.answer("❌ Error loading account details", show_alert=True)
     
-    # === Premium Management Functions ===
-    
-    async def show_premium_management(self, callback_query: types.CallbackQuery):
-        """Show premium management panel"""
-        premium_users = await self.db.get_premium_users()
-        premium_count = len(premium_users)
-        
-        text = f"""
-💎 **Premium Management Center**
-
-┌──── 📊 **Overview** ────┐
-│ Premium Users: {premium_count}
-│ Active Subscriptions: {premium_count}
-│ Total Revenue Tracking: Active
-└─────────────────────────┘
-
-🎯 **Management Options:**
-• ⬆️ **Upgrade User** - Grant premium access
-• ⬇️ **Downgrade User** - Remove premium status  
-• ⚙️ **Custom Limits** - Set individual user limits
-• 👥 **Premium Users** - View all premium members
-
-💡 **Quick Actions Available Below**
-        """
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.premium_management(),
-            parse_mode="Markdown"
-        )
-        await callback_query.answer()
+    # Premium management functions removed for personal use
     
     async def show_channel_control(self, callback_query: types.CallbackQuery):
         """Show channel control panel"""
@@ -913,120 +840,7 @@ Use the account management menu to add/remove accounts.
         )
         await callback_query.answer()
     
-    # === Premium Management Action Functions ===
-    
-    async def start_premium_upgrade(self, callback_query: types.CallbackQuery, state: FSMContext):
-        """Start premium upgrade process"""
-        text = """
-💎 **Upgrade User to Premium**
-
-┌──── 📝 **Instructions** ────┐
-│ Send the user ID to upgrade  │
-│ to premium status            │
-└─────────────────────────────┘
-
-📋 **Example:** 123456789
-
-💡 **Note:** User will get unlimited channels and high boost limits
-        """
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
-        await state.set_state(AdminStates.waiting_for_premium_user_id)
-        await state.update_data(action="upgrade")
-        await callback_query.answer()
-    
-    async def start_premium_downgrade(self, callback_query: types.CallbackQuery, state: FSMContext):
-        """Start premium downgrade process"""
-        text = """
-⬇️ **Downgrade User from Premium**
-
-┌──── 📝 **Instructions** ────┐
-│ Send the user ID to downgrade│
-│ from premium status          │
-└─────────────────────────────┘
-
-📋 **Example:** 123456789
-
-⚠️ **Warning:** User will lose premium benefits immediately
-        """
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
-        await state.set_state(AdminStates.waiting_for_premium_user_id)
-        await state.update_data(action="downgrade")
-        await callback_query.answer()
-    
-    async def start_premium_limits(self, callback_query: types.CallbackQuery, state: FSMContext):
-        """Start premium limits setting process"""
-        text = """
-⚙️ **Set Custom Premium Limits**
-
-┌──── 📝 **Instructions** ────┐
-│ Send: UserID MaxChannels MaxBoosts │
-│ Format: 123456789 10 5000         │
-└──────────────────────────────────┘
-
-📋 **Examples:**
-• `123456789 5 1000` - 5 channels, 1000 daily boosts
-• `987654321 unlimited unlimited` - No limits
-
-💡 **Current defaults:** 999 channels, 9999 daily boosts
-        """
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.cancel_operation(),
-            parse_mode="Markdown"
-        )
-        await state.set_state(AdminStates.waiting_for_premium_limits)
-        await callback_query.answer()
-    
-    async def show_premium_list(self, callback_query: types.CallbackQuery):
-        """Show list of premium users"""
-        premium_users = await self.db.get_premium_users()
-        
-        if not premium_users:
-            text = """
-💎 **Premium Users List**
-
-┌──── 📊 **Status** ────┐
-│ No premium users found │
-└───────────────────────┘
-
-💡 **Use the upgrade option to add premium users**
-            """
-        else:
-            text = f"""
-💎 **Premium Users List** ({len(premium_users)} users)
-
-┌──── 📊 **Premium Members** ────┐
-"""
-            for user in premium_users:
-                user_id = user.get('id', 'Unknown')
-                channels = user.get('max_channels', 999)
-                boosts = user.get('max_daily_boosts', 9999)
-                upgrade_date = Utils.format_datetime(user.get('upgrade_date'))
-                
-                text += f"""│ 🔸 User ID: {user_id}
-│   Channels: {channels}, Boosts: {boosts}
-│   Upgraded: {upgrade_date}
-│
-"""
-            text += "└────────────────────────────────┘"
-        
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.back_button("admin_premium"),
-            parse_mode="Markdown"
-        )
-        await callback_query.answer()
+    # Premium management action functions removed for personal use
     
     # === Channel Control Action Functions ===
     
@@ -1154,51 +968,7 @@ Use the account management menu to add/remove accounts.
     
     # === Processing Functions ===
     
-    async def process_premium_user_id(self, message: types.Message, state: FSMContext):
-        """Process premium user ID input"""
-        try:
-            user_id = int(message.text.strip())
-            data = await state.get_data()
-            action = data.get("action")
-            admin_id = message.from_user.id
-            
-            if action == "upgrade":
-                await self.db.upgrade_user_to_premium(user_id, admin_id)
-                await message.answer(f"✅ User {user_id} upgraded to premium!")
-            elif action == "downgrade":
-                await self.db.downgrade_user_from_premium(user_id, admin_id)
-                await message.answer(f"✅ User {user_id} downgraded from premium!")
-            
-            await state.clear()
-            
-        except ValueError:
-            await message.answer("❌ Invalid user ID. Please send numbers only.")
-        except Exception as e:
-            logger.error(f"Error processing premium user ID: {e}")
-            await message.answer("❌ Error processing request. Please try again.")
-    
-    async def process_premium_limits(self, message: types.Message, state: FSMContext):
-        """Process premium limits input"""
-        try:
-            parts = message.text.strip().split()
-            if len(parts) != 3:
-                await message.answer("❌ Format: UserID MaxChannels MaxBoosts")
-                return
-            
-            user_id = int(parts[0])
-            max_channels = 999 if parts[1].lower() == "unlimited" else int(parts[1])
-            max_boosts = 9999 if parts[2].lower() == "unlimited" else int(parts[2])
-            
-            await self.db.update_premium_limits(user_id, max_channels, max_boosts)
-            await message.answer(f"✅ Updated limits for user {user_id}:\nChannels: {max_channels}\nDaily Boosts: {max_boosts}")
-            
-            await state.clear()
-            
-        except ValueError:
-            await message.answer("❌ Invalid format. Use: UserID MaxChannels MaxBoosts")
-        except Exception as e:
-            logger.error(f"Error processing premium limits: {e}")
-            await message.answer("❌ Error processing request. Please try again.")
+    # Premium processing functions removed for personal use
     
     async def process_channel_link(self, message: types.Message, state: FSMContext):
         """Process channel link input"""
