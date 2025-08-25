@@ -590,6 +590,7 @@ Send message IDs or "auto", or /cancel to abort.
         if input_text.lower() == "auto":
             # Auto-detect recent messages using user's setting
             auto_count = await self.get_user_setting(user_id, "auto_message_count") or 10
+            logger.info(f"🔍 DEBUG: User {user_id} auto_count setting retrieved: {auto_count}")
             message_ids = await self.telethon.get_channel_messages(channel_link, limit=auto_count)
             if not message_ids:
                 await message.answer("❌ Could not find recent messages in the channel.")
