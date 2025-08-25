@@ -252,12 +252,12 @@ class TelethonManager:
             client, account = client_data
             
             try:
-                # Join the channel
-                result = await client(events.common.resolve_peer(channel_link))
-                entity = await client.get_entity(result)
+                # Get the channel entity directly
+                entity = await client.get_entity(channel_link)
                 
                 # Join if not already a member
-                await client(events.common.JoinChannelRequest(entity))
+                from telethon.tl.functions.channels import JoinChannelRequest
+                await client(JoinChannelRequest(entity))
                 
                 # Get channel info
                 channel_id = str(entity.id)
