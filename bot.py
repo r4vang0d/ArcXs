@@ -57,9 +57,9 @@ class ViewBoosterBot:
         # Callback handlers
         self.dp.callback_query.register(self.handle_callback)
         
-        # All text message handling in one place to avoid conflicts
+        # All text message handling - simplified filter
         self.dp.message.register(self.handle_text_message, 
-                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
+                               lambda message: message.text and not message.text.startswith('/') and message.from_user and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
         """Handle /start command - Admin only"""
@@ -234,18 +234,16 @@ class ViewBoosterBot:
         
         try:
             current_state = await state.get_state()
-            logger.info(f"Text message received from {user_id}, current state: {current_state}")
+            message_text = message.text.strip()
+            logger.info(f"📨 Text message received from {user_id}: '{message_text}' | State: {current_state}")
             
-            # Route to appropriate handler based on state and message content
-            if current_state and current_state.startswith('UserStates:'):
-                # User FSM states (channel addition, etc.)
-                await self.user_handler.handle_message(message, state)
-            elif current_state and current_state.startswith('AdminStates:'):
-                # Admin FSM states (account management, etc.)
+            # Always try user handler first since most operations are user-related
+            await self.user_handler.handle_message(message, state)
+            
+            # If user handler didn't handle it, try admin handler
+            if current_state and 'AdminStates' in str(current_state):
+                logger.info("🔄 Trying admin handler as fallback")
                 await self.admin_handler.handle_message(message, state)
-            else:
-                # Default: try user handler first, then admin
-                await self.user_handler.handle_message(message, state)
                 
         except Exception as e:
             logger.error(f"Error routing text message: {e}")
