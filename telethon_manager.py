@@ -208,6 +208,9 @@ class TelethonManager:
                     await self.db.update_account_status(account["id"], AccountStatus.INACTIVE)
                     logger.warning(f"Session file missing for {session_name}")
             
+            # Update usernames for existing accounts that don't have them
+            await self.update_account_usernames()
+            
             logger.info(f"Loaded {len(self.active_clients)} active sessions")
             
         except Exception as e:
@@ -442,6 +445,32 @@ class TelethonManager:
             health_stats[status] = health_stats.get(status, 0) + 1
         
         return health_stats
+    
+    async def update_account_usernames(self):
+        """Update usernames for existing accounts that don't have them"""
+        try:
+            accounts = await self.db.get_accounts()
+            
+            for account in accounts:
+                if not account.get('username') and account['session_name'] in self.clients:
+                    try:
+                        client = self.clients[account['session_name']]
+                        if await client.is_user_authorized():
+                            me = await client.get_me()
+                            username = me.username if hasattr(me, 'username') and me.username else me.first_name
+                            
+                            # Update the database with the username
+                            await self.db._execute_with_lock("""
+                                UPDATE accounts SET username = ? WHERE id = ?
+                            """, (username, account['id']))
+                            await self.db._commit_with_lock()
+                            
+                            logger.info(f"Updated username for account {account['phone']}: {username}")
+                    except Exception as e:
+                        logger.error(f"Error updating username for {account['phone']}: {e}")
+                        
+        except Exception as e:
+            logger.error(f"Error updating account usernames: {e}")
     
     async def cleanup(self):
         """Cleanup all clients on shutdown"""
