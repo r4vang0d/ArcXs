@@ -852,8 +852,12 @@ Select a channel below to start:
             await callback_query.answer()
             
         except Exception as e:
-            logger.error(f"Error showing settings: {e}")
-            await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
+            # Handle "message not modified" error silently (it's harmless)
+            if "message is not modified" in str(e):
+                await callback_query.answer()
+            else:
+                logger.error(f"Error showing settings: {e}")
+                await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
     
     async def handle_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle setting changes"""
@@ -888,11 +892,15 @@ Select a channel below to start:
             """
             
             if callback_query.message:
-                await callback_query.message.edit_text(
-                    text,
-                    reply_markup=BotKeyboards.delay_settings(),
-                    parse_mode="Markdown"
-                )
+                try:
+                    await callback_query.message.edit_text(
+                        text,
+                        reply_markup=BotKeyboards.delay_settings(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    if "message is not modified" not in str(e):
+                        logger.error(f"Error editing delay settings message: {e}")
             await callback_query.answer()
         
         elif data == "setting_auto_count":
@@ -921,11 +929,15 @@ Select a channel below to start:
             """
             
             if callback_query.message:
-                await callback_query.message.edit_text(
-                    text,
-                    reply_markup=BotKeyboards.auto_count_settings(),
-                    parse_mode="Markdown"
-                )
+                try:
+                    await callback_query.message.edit_text(
+                        text,
+                        reply_markup=BotKeyboards.auto_count_settings(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    if "message is not modified" not in str(e):
+                        logger.error(f"Error editing auto count settings message: {e}")
             await callback_query.answer()
         
         # Refresh settings if not delay or auto_count
