@@ -79,12 +79,19 @@ class UserHandler:
     
     async def handle_message(self, message: types.Message, state: FSMContext):
         """Handle user text messages"""
-        current_state = await state.get_state()
-        
-        if current_state == UserStates.waiting_for_channel.state:
-            await self.process_add_channel(message, state)
-        elif current_state == UserStates.waiting_for_message_ids.state:
-            await self.process_boost_messages(message, state)
+        try:
+            current_state = await state.get_state()
+            logger.info(f"User message received in state: {current_state}")
+            
+            if current_state == UserStates.waiting_for_channel.state:
+                await self.process_add_channel(message, state)
+            elif current_state == UserStates.waiting_for_message_ids.state:
+                await self.process_boost_messages(message, state)
+            else:
+                logger.info(f"No handler for state: {current_state}")
+        except Exception as e:
+            logger.error(f"Error handling user message: {e}")
+            await message.answer("❌ An error occurred. Please try again or contact support.")
     
     async def show_main_menu(self, callback_query: types.CallbackQuery):
         """Show main menu"""
@@ -209,6 +216,7 @@ Features:
                 reply_markup=BotKeyboards.cancel_operation()
             )
         await state.set_state(UserStates.waiting_for_channel)
+        logger.info(f"Set state to waiting_for_channel for user {user_id}")
         await callback_query.answer()
     
     async def process_add_channel(self, message: types.Message, state: FSMContext):
@@ -238,6 +246,7 @@ Features:
         
         try:
             # Join channel with available accounts
+            logger.info(f"Attempting to join channel: {normalized_link}")
             success, join_message, channel_id = await self.telethon.join_channel(normalized_link)
             
             if success:

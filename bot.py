@@ -57,12 +57,16 @@ class ViewBoosterBot:
         # Callback handlers
         self.dp.callback_query.register(self.handle_callback)
         
-        # Message handlers for FSM states and admin/user input
-        self.dp.message.register(self.handle_phone_input, 
-                               lambda message: message.text and not message.text.startswith('/'))
-        
-        # Admin message handlers
+        # Admin message handlers (priority for admin operations)
         self.dp.message.register(self.admin_handler.handle_message,
+                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
+        
+        # User message handlers (for channel addition, FSM states, etc.)
+        self.dp.message.register(self.user_handler.handle_message,
+                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
+        
+        # General message handler (for phone input and other states)
+        self.dp.message.register(self.handle_phone_input, 
                                lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
