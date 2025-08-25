@@ -843,12 +843,29 @@ Select a channel below to start:
 💡 **Tip:** Our AI manages accounts automatically for maximum efficiency
             """
             
-            await self.safe_edit_message(callback_query, text, BotKeyboards.settings_menu(), "Markdown")
+            # Handle message editing with complete error suppression
+            if callback_query.message:
+                try:
+                    await callback_query.message.edit_text(
+                        text,
+                        reply_markup=BotKeyboards.settings_menu(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as edit_error:
+                    if "message is not modified" in str(edit_error):
+                        # Completely ignore this harmless error
+                        pass
+                    else:
+                        # Log other errors but don't raise them
+                        logger.warning(f"Non-critical message edit error: {edit_error}")
+            
             await callback_query.answer()
             
         except Exception as e:
-            logger.error(f"Error showing settings: {e}")
-            await callback_query.answer("❌ Error loading settings. Please try again.", show_alert=True)
+            # Only log truly unexpected errors
+            if "message is not modified" not in str(e):
+                logger.error(f"Error showing settings: {e}")
+            await callback_query.answer()
     
     async def handle_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle setting changes"""
