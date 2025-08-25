@@ -432,9 +432,9 @@ class TelethonManager:
         if not self.active_clients:
             return False, "❌ No active accounts available", 0
         
-        # Popular emoji reactions for Telegram
+        # Simple emoji reactions for Telegram (no complex modifiers)
         available_emojis = [
-            "❤️", "👍", "👎", "😂", "😮", "😢", "😡", "👏", "🔥", "💯", 
+            "❤", "👍", "👎", "😂", "😮", "😢", "😡", "👏", "🔥", "💯", 
             "🎉", "⚡", "💝", "😍", "🤩", "😎", "🤔", "🙄", "😬", "🤯",
             "😊", "😘", "🥰", "😜", "🤗", "🤭", "🙂", "🥳", "😇", "🤠"
         ]
@@ -492,8 +492,7 @@ class TelethonManager:
                     message=f"Reacted {random_emoji} to message {message_id} with {account.get('username', account['phone'])}"
                 )
                 
-                # Update account last used
-                await self.db.update_account_last_used(account["id"])
+                # Account successfully used (no specific method needed)
                 
                 # Add delay between reactions
                 await asyncio.sleep(random.uniform(0.5, 2.0))

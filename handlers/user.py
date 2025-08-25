@@ -694,7 +694,10 @@ Send message IDs or "auto", or /cancel to abort.
                 channel_link, message_ids
             )
             
-            await processing_msg.delete()
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass  # Ignore message deletion errors
             
             if success:
                 # Update channel boost count (treat reactions as boosts in stats)
@@ -724,7 +727,10 @@ Send message IDs or "auto", or /cancel to abort.
                 )
         
         except Exception as e:
-            await processing_msg.delete()
+            try:
+                await processing_msg.delete()
+            except Exception:
+                pass  # Ignore message deletion errors
             logger.error(f"Error adding reactions: {e}")
             await message.answer(
                 "❌ An error occurred during reactions. Please try again.",
