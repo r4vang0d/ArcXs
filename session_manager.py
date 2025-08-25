@@ -16,8 +16,8 @@ from telethon.errors import (
     PhoneNumberInvalidError, ChannelPrivateError, ChatAdminRequiredError,
     UserBannedInChannelError, UserAlreadyParticipantError, PeerFloodError
 )
-from telethon.tl.functions.messages import GetMessagesViewsRequest
-from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser
+from telethon.tl.functions.messages import GetMessagesViewsRequest, SendReactionRequest
+from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser, ReactionEmoji
 
 from database import DatabaseManager, AccountStatus, LogType
 from config import Config
@@ -423,6 +423,118 @@ class TelethonManager:
             return True, f"✅ Boosted {len(message_ids)} messages with {successful_accounts}/{total_accounts} accounts", total_boosts
         else:
             return False, "❌ No views were boosted", 0
+
+    async def react_to_messages(self, channel_link: str, message_ids: List[int]) -> Tuple[bool, str, int]:
+        """
+        React to specific messages with random emojis using accounts one by one
+        Returns (success, message, reaction_count)
+        """
+        if not self.active_clients:
+            return False, "❌ No active accounts available", 0
+        
+        # Popular emoji reactions for Telegram
+        available_emojis = [
+            "❤️", "👍", "👎", "😂", "😮", "😢", "😡", "👏", "🔥", "💯", 
+            "🎉", "⚡", "💝", "😍", "🤩", "😎", "🤔", "🙄", "😬", "🤯",
+            "😊", "😘", "🥰", "😜", "🤗", "🤭", "🙂", "🥳", "😇", "🤠"
+        ]
+        
+        total_reactions = 0
+        successful_accounts = 0
+        used_accounts = []
+        
+        # Process one account per message ID for rotation
+        available_sessions = self.active_clients.copy()
+        
+        for i, message_id in enumerate(message_ids):
+            # Cycle through accounts
+            if not available_sessions:
+                available_sessions = self.active_clients.copy()
+            
+            if i >= len(available_sessions):
+                # Reset cycle if more messages than accounts
+                session_name = available_sessions[i % len(available_sessions)]
+            else:
+                session_name = available_sessions[i]
+            
+            if session_name not in self.clients:
+                continue
+                
+            client = self.clients[session_name]
+            
+            # Get account info from database
+            accounts = await self.db.get_active_accounts()
+            account = next((acc for acc in accounts if acc["session_name"] == session_name), None)
+            if not account:
+                continue
+                
+            try:
+                # Get channel entity
+                entity = await client.get_entity(channel_link)
+                
+                # Select random emoji
+                random_emoji = random.choice(available_emojis)
+                
+                # Send reaction
+                await client(SendReactionRequest(
+                    peer=entity,
+                    msg_id=message_id,
+                    reaction=[ReactionEmoji(emoticon=random_emoji)]
+                ))
+                
+                total_reactions += 1
+                successful_accounts += 1
+                
+                # Log success
+                await self.db.log_action(
+                    LogType.BOOST,  # Using BOOST log type for reactions
+                    account_id=account["id"],
+                    message=f"Reacted {random_emoji} to message {message_id} with {account.get('username', account['phone'])}"
+                )
+                
+                # Update account last used
+                await self.db.update_account_last_used(account["id"])
+                
+                # Add delay between reactions
+                await asyncio.sleep(random.uniform(0.5, 2.0))
+                
+            except FloodWaitError as e:
+                # Set flood wait status
+                flood_wait_until = datetime.now() + timedelta(seconds=e.seconds)
+                await self.db.update_account_status(account["id"], AccountStatus.FLOOD_WAIT, flood_wait_until)
+                await self.db.log_action(
+                    LogType.FLOOD_WAIT,
+                    account_id=account["id"],
+                    message=f"Flood wait during reaction: {e.seconds}s for {account.get('username', account['phone'])}"
+                )
+                continue
+                
+            except UserBannedInChannelError:
+                # Mark account as banned
+                await self.db.update_account_status(account["id"], AccountStatus.BANNED)
+                await self.db.log_action(
+                    LogType.BAN,
+                    account_id=account["id"],
+                    message=f"Account {account.get('username', account['phone'])} banned during reaction"
+                )
+                continue
+                
+            except Exception as e:
+                logger.error(f"Error reacting to message {message_id} with {account.get('username', account['phone'])}: {e}")
+                await self.db.increment_failed_attempts(account["id"])
+                await self.db.log_action(
+                    LogType.ERROR,
+                    account_id=account["id"],
+                    message=f"Reaction error: {str(e)}"
+                )
+                continue
+        
+        if total_reactions > 0:
+            result_message = f"✅ Added {total_reactions} emoji reactions using {successful_accounts} accounts"
+        else:
+            result_message = "❌ No reactions were added"
+            
+        return total_reactions > 0, result_message, total_reactions
     
     async def get_channel_messages(self, channel_link: str, limit: int = 10) -> List[int]:
         """Get recent message IDs from a channel"""

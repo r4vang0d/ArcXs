@@ -82,6 +82,7 @@ class BotKeyboards:
         """Boost options for a specific channel"""
         buttons = [
             [InlineKeyboardButton(text="⚡ Instant Boost", callback_data=f"instant_boost:{channel_id}")],
+            [InlineKeyboardButton(text="😍 Add Reactions", callback_data=f"add_reactions:{channel_id}")],
             [InlineKeyboardButton(text="🕐 Schedule Boost", callback_data=f"schedule_boost:{channel_id}")],
             [InlineKeyboardButton(text="📊 Boost Stats", callback_data=f"boost_stats:{channel_id}")],
             [InlineKeyboardButton(text="🔙 Back", callback_data="boost_views")],

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class UserStates(StatesGroup):
     waiting_for_channel = State()
     waiting_for_message_ids = State()
+    waiting_for_reaction_message_ids = State()
 
 class UserHandler:
     """Handles user-specific operations"""
@@ -64,6 +65,8 @@ class UserHandler:
             await self.confirm_remove_channel(callback_query, data)
         elif data.startswith("instant_boost:"):
             await self.start_instant_boost(callback_query, data, state)
+        elif data.startswith("add_reactions:"):
+            await self.start_add_reactions(callback_query, data, state)
         elif data.startswith("boost_stats:"):
             await self.show_boost_stats(callback_query, data)
         elif data.startswith("setting_"):
@@ -87,6 +90,8 @@ class UserHandler:
                 await self.process_add_channel(message, state)
             elif current_state == UserStates.waiting_for_message_ids.state:
                 await self.process_boost_messages(message, state)
+            elif current_state == UserStates.waiting_for_reaction_message_ids.state:
+                await self.process_reaction_messages(message, state)
             else:
                 logger.info(f"No handler for state: {current_state}")
         except Exception as e:
@@ -494,6 +499,59 @@ Send message IDs or "auto", or /cancel to abort.
         except Exception as e:
             logger.error(f"Error starting instant boost: {e}")
             await callback_query.answer("❌ Error starting boost", show_alert=True)
+
+    async def start_add_reactions(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Start emoji reactions process"""
+        try:
+            channel_id = int(data.split(":")[1])
+            user_id = callback_query.from_user.id
+            
+            # Get channel info
+            channels = await self.db.get_user_channels(user_id)
+            channel = next((ch for ch in channels if ch["id"] == channel_id), None)
+            
+            if not channel:
+                await callback_query.answer("❌ Channel not found", show_alert=True)
+                return
+            
+            # Store channel info in state
+            await state.update_data(reaction_channel_id=channel_id, reaction_channel_link=channel["channel_link"])
+            
+            text = f"""
+😍 **Add Emoji Reactions**
+
+Channel: {channel.get("title") or channel["channel_link"]}
+
+**How it works:**
+• Each account reacts with a random emoji 
+• Accounts cycle through message IDs one by one
+• Popular emojis: ❤️ 👍 😂 🔥 💯 🎉 😍 and more!
+
+**Option 1: Auto-detect messages**
+Send "auto" to react to the latest 10 messages automatically.
+
+**Option 2: Specific messages**
+Send message IDs separated by commas or spaces.
+Examples:
+• 123, 124, 125
+• 100 101 102
+• 50-55 (range)
+
+Send message IDs or "auto", or /cancel to abort.
+            """
+            
+            if callback_query.message:
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
+            await state.set_state(UserStates.waiting_for_reaction_message_ids)
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error starting emoji reactions: {e}")
+            await callback_query.answer("❌ Error starting reactions", show_alert=True)
     
     async def process_boost_messages(self, message: types.Message, state: FSMContext):
         """Process boost with message IDs"""
@@ -578,6 +636,95 @@ Send message IDs or "auto", or /cancel to abort.
             logger.error(f"Error boosting messages: {e}")
             await message.answer(
                 "❌ An error occurred during boost. Please try again.",
+                reply_markup=BotKeyboards.main_menu(True)
+            )
+        
+        await state.clear()
+
+    async def process_reaction_messages(self, message: types.Message, state: FSMContext):
+        """Process emoji reactions with message IDs"""
+        if not message.from_user or not message.text:
+            return
+        user_id = message.from_user.id
+        input_text = message.text.strip()
+        
+        if input_text == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled",
+                               reply_markup=BotKeyboards.main_menu(True))
+            return
+        
+        # Get state data
+        data = await state.get_data()
+        channel_id = data.get("reaction_channel_id")
+        channel_link = data.get("reaction_channel_link")
+        
+        if not channel_id or not channel_link:
+            await message.answer("❌ Session expired. Please try again.",
+                               reply_markup=BotKeyboards.main_menu(True))
+            await state.clear()
+            return
+        
+        # Process message IDs
+        if input_text.lower() == "auto":
+            # Auto-detect recent messages
+            message_ids = await self.telethon.get_channel_messages(channel_link, limit=10)
+            if not message_ids:
+                await message.answer("❌ Could not find recent messages in the channel.")
+                return
+        else:
+            # Parse specific message IDs
+            is_valid, message_ids, error_msg = Utils.validate_message_ids_input(input_text)
+            if not is_valid:
+                await message.answer(f"❌ {error_msg}")
+                return
+        
+        # Show processing message
+        processing_msg = await message.answer(
+            f"😍 Adding reactions to {len(message_ids)} messages...\n" +
+            f"🔄 Cycling through accounts with random emojis"
+        )
+        
+        try:
+            # Perform emoji reactions
+            success, result_message, reaction_count = await self.telethon.react_to_messages(
+                channel_link, message_ids
+            )
+            
+            await processing_msg.delete()
+            
+            if success:
+                # Update channel boost count (treat reactions as boosts in stats)
+                await self.db.update_channel_boosts(channel_id, reaction_count)
+                
+                # Log the action
+                await self.db.log_action(
+                    LogType.BOOST,
+                    channel_link=channel_link,
+                    message=f"Added {reaction_count} emoji reactions to messages: {message_ids[:5]}"
+                )
+                
+                await message.answer(
+                    f"🎉 **Reactions Complete!**\n\n"
+                    f"✨ **Results:**\n"
+                    f"{result_message}\n\n"
+                    f"💫 Each message now has unique random emoji reactions from your accounts!",
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+            else:
+                await message.answer(
+                    f"❌ **Reactions Failed**\n\n{result_message}\n\n"
+                    f"💡 Try adding more active accounts or check account health.",
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+        
+        except Exception as e:
+            await processing_msg.delete()
+            logger.error(f"Error adding reactions: {e}")
+            await message.answer(
+                "❌ An error occurred during reactions. Please try again.",
                 reply_markup=BotKeyboards.main_menu(True)
             )
         
