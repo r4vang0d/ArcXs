@@ -523,13 +523,9 @@ Send message IDs or "auto", or /cancel to abort.
         user_id = callback_query.from_user.id
         
         try:
-            views_only = await self.get_user_setting(user_id, "views_only")
-            rotation = await self.get_user_setting(user_id, "account_rotation")
             delay_level = await self.get_user_setting(user_id, "delay_level")
             
-            # Provide default values if None
-            views_only = views_only if views_only is not None else False
-            rotation = rotation if rotation is not None else False
+            # Provide default value if None
             delay_level = delay_level if delay_level is not None else "medium"
             
             # Ensure delay_level is a valid string
@@ -541,16 +537,10 @@ Send message IDs or "auto", or /cancel to abort.
             text = f"""
 ⚙️ **Settings**
 
-📖 **Boost Mode:**
-Currently: {'👁️ Views Only' if views_only else '👁️📖 Views + Read'}
-
-🔄 **Account Rotation:**
-Currently: {'✅ Enabled' if rotation else '❌ Disabled'}
-
 ⏱️ **Boost Delay:**
 Currently: {delay_level.title()} ({delay_range[0]}-{delay_range[1]}s)
 
-Choose a setting to modify:
+The bot automatically handles account rotation and reading for optimal performance.
             """
             
             if callback_query.message:
@@ -569,17 +559,7 @@ Choose a setting to modify:
         """Handle setting changes"""
         user_id = callback_query.from_user.id
         
-        if data == "setting_views_only":
-            await self.update_user_setting(user_id, "views_only", True)
-            await callback_query.answer("✅ Set to Views Only mode")
-        elif data == "setting_views_read":
-            await self.update_user_setting(user_id, "views_only", False)
-            await callback_query.answer("✅ Set to Views + Read mode")
-        elif data == "setting_rotation":
-            current = await self.get_user_setting(user_id, "account_rotation")
-            await self.update_user_setting(user_id, "account_rotation", not current)
-            await callback_query.answer(f"✅ Account rotation {'disabled' if current else 'enabled'}")
-        elif data == "setting_delay":
+        if data == "setting_delay":
             text = """
 ⏱️ **Boost Delay Settings**
 

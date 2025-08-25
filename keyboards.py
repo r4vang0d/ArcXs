@@ -112,10 +112,7 @@ class BotKeyboards:
     def settings_menu() -> InlineKeyboardMarkup:
         """Settings configuration menu"""
         buttons = [
-            [InlineKeyboardButton(text="👁️ Views Only", callback_data="setting_views_only"),
-             InlineKeyboardButton(text="👁️📖 Views + Read", callback_data="setting_views_read")],
-            [InlineKeyboardButton(text="🔄 Account Rotation", callback_data="setting_rotation"),
-             InlineKeyboardButton(text="⏱️ Boost Delay", callback_data="setting_delay")],
+            [InlineKeyboardButton(text="⏱️ Boost Delay", callback_data="setting_delay")],
             [InlineKeyboardButton(text="🔙 User Panel", callback_data="user_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
