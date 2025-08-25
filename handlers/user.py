@@ -57,8 +57,6 @@ class UserHandler:
             await self.show_my_stats(callback_query)
         elif data == "boost_views":
             await self.show_boost_menu(callback_query)
-        elif data == "emoji_reactions":
-            await self.show_emoji_reactions_menu(callback_query)
         elif data == "settings":
             await self.show_settings(callback_query)
         elif data.startswith("channel_info:"):
@@ -554,74 +552,6 @@ Send message IDs or "auto", or /cancel to abort.
         except Exception as e:
             logger.error(f"Error starting emoji reactions: {e}")
             await callback_query.answer("❌ Error starting reactions", show_alert=True)
-
-    async def show_emoji_reactions_menu(self, callback_query: types.CallbackQuery):
-        """Show emoji reactions menu with channel list"""
-        user_id = callback_query.from_user.id
-        
-        try:
-            channels = await self.db.get_user_channels(user_id)
-            
-            if not channels:
-                text = """
-🎭 **Emoji Reactions**
-
-You need to add channels first to add emoji reactions!
-
-➕ **Add a channel** and then come back to add reactions with random emojis using account rotation.
-                """
-                
-                if callback_query.message:
-                    await callback_query.message.edit_text(
-                        text,
-                        reply_markup=BotKeyboards.main_menu(True),
-                        parse_mode="Markdown"
-                    )
-                await callback_query.answer()
-                return
-            
-            # Show channels for emoji reactions
-            text = f"""
-🎭 **Emoji Reactions**
-
-Select a channel to add random emoji reactions:
-
-**How it works:**
-• Each account adds a different random emoji
-• Cycles through all your accounts automatically  
-• Uses 30+ popular emojis: ❤️ 👍 😂 🔥 💯 🎉 😍
-
-**You have {len(channels)} channel(s) ready:**
-            """
-            
-            # Create custom keyboard for emoji reactions
-            buttons = []
-            for channel in channels:
-                channel_name = channel.get("title") or channel["channel_link"]
-                if len(channel_name) > 25:
-                    channel_name = channel_name[:22] + "..."
-                
-                buttons.append([
-                    InlineKeyboardButton(
-                        text=f"🎭 {channel_name}",
-                        callback_data=f"add_reactions:{channel['id']}"
-                    )
-                ])
-            
-            buttons.append([InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")])
-            keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-            
-            if callback_query.message:
-                await callback_query.message.edit_text(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode="Markdown"
-                )
-            await callback_query.answer()
-            
-        except Exception as e:
-            logger.error(f"Error showing emoji reactions menu: {e}")
-            await callback_query.answer("❌ Error loading reactions menu", show_alert=True)
     
     async def process_boost_messages(self, message: types.Message, state: FSMContext):
         """Process boost with message IDs"""

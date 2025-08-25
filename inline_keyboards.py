@@ -14,7 +14,7 @@ class BotKeyboards:
         # Always return personal interface since it's personal use
         buttons = [
             [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
-             InlineKeyboardButton(text="🎭 Emoji Reactions", callback_data="emoji_reactions")],
+             InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views")],
             [InlineKeyboardButton(text="📱 Manage Accounts", callback_data="admin_accounts"),
              InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats")],
             [InlineKeyboardButton(text="💚 System Health", callback_data="admin_health"),
