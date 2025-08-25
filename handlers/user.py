@@ -843,20 +843,7 @@ Select a channel below to start:
 💡 **Tip:** Our AI manages accounts automatically for maximum efficiency
             """
             
-            if callback_query.message:
-                try:
-                    await callback_query.message.edit_text(
-                        text,
-                        reply_markup=BotKeyboards.settings_menu(),
-                        parse_mode="Markdown"
-                    )
-                except Exception as e:
-                    if "message is not modified" in str(e):
-                        # Silently ignore this harmless error
-                        pass
-                    else:
-                        logger.error(f"Error editing settings message: {e}")
-                        raise e
+            await self.safe_edit_message(callback_query, text, BotKeyboards.settings_menu(), "Markdown")
             await callback_query.answer()
             
         except Exception as e:
@@ -895,16 +882,7 @@ Select a channel below to start:
 💡 **Pro Tip:** Balanced mode offers the best results for most campaigns
             """
             
-            if callback_query.message:
-                try:
-                    await callback_query.message.edit_text(
-                        text,
-                        reply_markup=BotKeyboards.delay_settings(),
-                        parse_mode="Markdown"
-                    )
-                except Exception as e:
-                    if "message is not modified" not in str(e):
-                        logger.error(f"Error editing delay settings message: {e}")
+            await self.safe_edit_message(callback_query, text, BotKeyboards.delay_settings(), "Markdown")
             await callback_query.answer()
         
         elif data == "setting_auto_count":
@@ -932,16 +910,7 @@ Select a channel below to start:
 💡 **Tip:** Lower counts are faster, higher counts give broader reach
             """
             
-            if callback_query.message:
-                try:
-                    await callback_query.message.edit_text(
-                        text,
-                        reply_markup=BotKeyboards.auto_count_settings(),
-                        parse_mode="Markdown"
-                    )
-                except Exception as e:
-                    if "message is not modified" not in str(e):
-                        logger.error(f"Error editing auto count settings message: {e}")
+            await self.safe_edit_message(callback_query, text, BotKeyboards.auto_count_settings(), "Markdown")
             await callback_query.answer()
         
         # Refresh settings if not delay or auto_count
@@ -1180,3 +1149,22 @@ Last Boosted: {last_boosted}
         except Exception as e:
             logger.error(f"Error updating user setting: {e}")
             return False
+    
+    async def safe_edit_message(self, callback_query: types.CallbackQuery, text: str, reply_markup=None, parse_mode="Markdown"):
+        """Safely edit message with proper error handling"""
+        if not callback_query.message:
+            return
+        
+        try:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode
+            )
+        except Exception as e:
+            if "message is not modified" in str(e):
+                # Silently ignore this harmless error
+                pass
+            else:
+                logger.error(f"Error editing message: {e}")
+                raise e
