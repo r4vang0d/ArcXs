@@ -272,7 +272,7 @@ class TelethonManager:
                 await self.db.log_action(
                     LogType.JOIN,
                     account_id=account["id"],
-                    message=f"Successfully joined {title} with {account['phone']}"
+                    message=f"Successfully joined {title} with {account.get('username', account['phone'])}"
                 )
                 
                 return True, f"✅ Successfully joined {title}", channel_id
@@ -294,7 +294,7 @@ class TelethonManager:
                 await self.db.log_action(
                     LogType.FLOOD_WAIT,
                     account_id=account["id"],
-                    message=f"Flood wait: {e.seconds}s for {account['phone']}"
+                    message=f"Flood wait: {e.seconds}s for {account.get('username', account['phone'])}"
                 )
                 failed_accounts += 1
                 
@@ -307,12 +307,12 @@ class TelethonManager:
                 await self.db.log_action(
                     LogType.BAN,
                     account_id=account["id"],
-                    message=f"Account {account['phone']} banned in channel"
+                    message=f"Account {account.get('username', account['phone'])} banned in channel"
                 )
                 failed_accounts += 1
                 
             except Exception as e:
-                logger.error(f"Error joining channel with {account['phone']}: {e}")
+                logger.error(f"Error joining channel with {account.get('username', account['phone'])}: {e}")
                 await self.db.increment_failed_attempts(account["id"])
                 await self.db.log_action(
                     LogType.ERROR,
@@ -369,7 +369,7 @@ class TelethonManager:
                 await self.db.log_action(
                     LogType.BOOST,
                     account_id=account["id"],
-                    message=f"Boosted {boost_count} messages with {account['phone']}"
+                    message=f"Boosted {boost_count} messages with {account.get('username', account['phone'])}"
                 )
                 
                 # Add random delay between accounts
@@ -389,7 +389,7 @@ class TelethonManager:
                 )
                 
             except Exception as e:
-                logger.error(f"Error boosting with {account['phone']}: {e}")
+                logger.error(f"Error boosting with {account.get('username', account['phone'])}: {e}")
                 await self.db.increment_failed_attempts(account["id"])
                 await self.db.log_action(
                     LogType.ERROR,
@@ -465,9 +465,9 @@ class TelethonManager:
                             """, (username, account['id']))
                             await self.db._commit_with_lock()
                             
-                            logger.info(f"Updated username for account {account['phone']}: {username}")
+                            logger.info(f"Updated username for account {account.get('username', account['phone'])}: {username}")
                     except Exception as e:
-                        logger.error(f"Error updating username for {account['phone']}: {e}")
+                        logger.error(f"Error updating username for {account.get('username', account['phone'])}: {e}")
                         
         except Exception as e:
             logger.error(f"Error updating account usernames: {e}")

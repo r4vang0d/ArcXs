@@ -696,10 +696,11 @@ Choose log type to view:
             text = f"🚫 **Banned Accounts** ({len(banned_accounts)} total)\n\n"
             
             for account in banned_accounts:
-                phone = account["phone"]
+                username = account.get("username")
+                display_name = f"@{username}" if username and not username.startswith('@') else username or account.get("phone", "Unknown")
                 banned_since = Utils.format_datetime(account.get("last_used"))
                 
-                text += f"📱 {phone}\n"
+                text += f"📱 {display_name}\n"
                 text += f"   └ Banned: {banned_since}\n\n"
         
         await callback_query.message.edit_text(

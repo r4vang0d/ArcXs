@@ -141,7 +141,6 @@ class BotKeyboards:
             }
             
             emoji = status_emoji.get(account["status"], "❓")
-            phone = account["phone"]
             
             username = account.get("username")
             if username:
