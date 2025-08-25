@@ -13,9 +13,9 @@ from aiogram.fsm.state import State, StatesGroup
 
 from config import Config
 from database import DatabaseManager, LogType
-from telethon_manager import TelethonManager
-from keyboards import BotKeyboards
-from utils import Utils
+from session_manager import TelethonManager
+from inline_keyboards import BotKeyboards
+from helpers import Utils
 
 logger = logging.getLogger(__name__)
 

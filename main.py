@@ -12,7 +12,7 @@ from pathlib import Path
 # Add current directory to Python path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from bot import ViewBoosterBot
+from telegram_bot import ViewBoosterBot
 from config import Config
 from database import DatabaseManager
 

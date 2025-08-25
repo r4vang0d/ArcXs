@@ -12,8 +12,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import Config
 from database import DatabaseManager
-from telethon_manager import TelethonManager
-from keyboards import BotKeyboards
+from session_manager import TelethonManager
+from inline_keyboards import BotKeyboards
 from handlers.admin import AdminHandler
 from handlers.user import UserHandler
 
