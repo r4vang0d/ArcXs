@@ -637,11 +637,12 @@ Choose log type to view:
                 text += f"🕐 {timestamp}\n"
                 text += f"📝 {message}{account}\n\n"
         
-        await callback_query.message.edit_text(
-            text,
-            reply_markup=BotKeyboards.back_button("admin_logs"),
-            parse_mode="Markdown"
-        )
+        if callback_query.message:
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.back_button("admin_logs"),
+                parse_mode="Markdown"
+            )
         await callback_query.answer()
     
     async def show_failed_operations(self, callback_query: types.CallbackQuery):

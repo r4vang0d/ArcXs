@@ -180,7 +180,7 @@ class ViewBoosterBot:
         
         try:
             # Admin handlers
-            if self.config.is_admin(user_id) and data.startswith(('admin_', 'add_account', 'remove_account', 'list_accounts', 'refresh_accounts', 'api_default', 'api_custom', 'cancel_operation')):
+            if self.config.is_admin(user_id) and data.startswith(('admin_', 'logs_', 'account_details:', 'add_account', 'remove_account', 'list_accounts', 'refresh_accounts', 'api_default', 'api_custom', 'cancel_operation')):
                 await self.admin_handler.handle_callback(callback_query, state)
                 return
             
