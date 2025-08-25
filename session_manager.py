@@ -645,6 +645,26 @@ class TelethonManager:
             logger.error(f"Error checking live stream for {channel_link}: {e}")
             return False
     
+    async def get_channel_info(self, channel_link: str) -> Dict[str, Any]:
+        """Get channel information"""
+        if not self.active_clients:
+            return None
+        
+        try:
+            client = self.clients[self.active_clients[0]]
+            entity = await client.get_entity(channel_link)
+            
+            return {
+                "id": entity.id,
+                "title": getattr(entity, 'title', 'Unknown Channel'),
+                "username": getattr(entity, 'username', None),
+                "participants_count": getattr(entity, 'participants_count', 0)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting channel info for {channel_link}: {e}")
+            return None
+    
     async def join_live_stream(self, channel_link: str) -> Dict[str, Any]:
         """Join live stream with all available accounts"""
         if not self.active_clients:
