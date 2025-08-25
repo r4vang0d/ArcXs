@@ -20,9 +20,9 @@ class BotKeyboards:
             ]
         else:
             buttons = [
-                [InlineKeyboardButton(text="📢 Add Channel", callback_data="add_channel"),
-                 InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views")],
-                [InlineKeyboardButton(text="📈 My Stats", callback_data="my_stats"),
+                [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
+                 InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views")],
+                [InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats"),
                  InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
             ]
         
@@ -32,10 +32,10 @@ class BotKeyboards:
     def user_panel() -> InlineKeyboardMarkup:
         """User panel keyboard"""
         buttons = [
-            [InlineKeyboardButton(text="📢 Add Channel", callback_data="add_channel"),
+            [InlineKeyboardButton(text="🎯 Add Channel", callback_data="add_channel"),
              InlineKeyboardButton(text="📋 My Channels", callback_data="my_channels")],
-            [InlineKeyboardButton(text="⚡ Boost Views", callback_data="boost_views"),
-             InlineKeyboardButton(text="📈 My Stats", callback_data="my_stats")],
+            [InlineKeyboardButton(text="🚀 Boost Views", callback_data="boost_views"),
+             InlineKeyboardButton(text="📊 Analytics", callback_data="my_stats")],
             [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
             [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
@@ -112,8 +112,8 @@ class BotKeyboards:
     def settings_menu() -> InlineKeyboardMarkup:
         """Settings configuration menu"""
         buttons = [
-            [InlineKeyboardButton(text="⏱️ Boost Delay", callback_data="setting_delay")],
-            [InlineKeyboardButton(text="🔙 User Panel", callback_data="user_panel")],
+            [InlineKeyboardButton(text="⚡ Performance Settings", callback_data="setting_delay")],
+            [InlineKeyboardButton(text="🔙 Dashboard", callback_data="user_panel")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
@@ -121,9 +121,9 @@ class BotKeyboards:
     def delay_settings() -> InlineKeyboardMarkup:
         """Delay configuration options"""
         buttons = [
-            [InlineKeyboardButton(text="🐇 Fast (1-2s)", callback_data="delay_low"),
-             InlineKeyboardButton(text="🚶 Medium (2-5s)", callback_data="delay_medium")],
-            [InlineKeyboardButton(text="🐢 Safe (5-10s)", callback_data="delay_high")],
+            [InlineKeyboardButton(text="🚀 Fast Mode", callback_data="delay_low"),
+             InlineKeyboardButton(text="⚡ Balanced", callback_data="delay_medium")],
+            [InlineKeyboardButton(text="🛡️ Safe Mode", callback_data="delay_high")],
             [InlineKeyboardButton(text="🔙 Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)

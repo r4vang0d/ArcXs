@@ -91,11 +91,16 @@ class UserHandler:
         is_admin = self.config.is_admin(user_id)
         
         welcome_text = f"""
-🚀 **View Booster Bot**
+🎯 **Professional View Booster**
 
-Welcome back, {callback_query.from_user.first_name}!
+┌─────────────────────────┐
+│  Welcome, {callback_query.from_user.first_name}! 👋
+└─────────────────────────┘
 
-{'Choose your panel:' if is_admin else 'What would you like to do?'}
+🔥 **Boost your Telegram channels with premium quality views**
+💎 **Powered by advanced automation technology**
+
+{'🛠 **Administrator Access** - Choose your management panel:' if is_admin else '⚡ **Ready to boost your content?** - Select an option below:'}
         """
         
         if callback_query.message:
@@ -116,14 +121,16 @@ Welcome back, {callback_query.from_user.first_name}!
         is_premium = await self.db.is_premium_user(user_id)
         
         panel_text = f"""
-👤 **User Panel**
+🎭 **Personal Dashboard**
 
-📊 **Your Account:**
-Status: {'Premium ⭐' if is_premium else 'Free 🆓'}
-Channels: {len(channels)}/{('∞' if is_premium else '1')}
-Total Boosts: {total_boosts:,}
+┌──── 📊 **Account Overview** ────┐
+│ Status: {'🌟 Premium Elite' if is_premium else '🎯 Free Tier'}
+│ Channels: {len(channels)}/{('∞' if is_premium else '1')} slots
+│ Total Boosts: {total_boosts:,} views
+└─────────────────────────────────┘
 
-What would you like to do?
+💪 **Ready to amplify your reach?**
+🚀 **Choose your next action below:**
         """
         
         if callback_query.message:
@@ -150,22 +157,30 @@ What would you like to do?
                 return
         
         text = """
-➕ **Add Channel**
+➕ **Channel Integration**
 
-Send the channel link or username:
+┌──── 🎯 **Setup Instructions** ────┐
+│
+│ 📝 **Step 1:** Send your channel link
+│ 🔗 **Step 2:** Our system will auto-join
+│ ⚡ **Step 3:** Start boosting instantly!
+│
+└───────────────────────────────────┘
 
-📱 **Supported formats:**
-• https://t.me/channel_name
-• https://t.me/joinchat/invite_code
-• @channel_name
-• channel_name
+📱 **Accepted Link Formats:**
+┌─────────────────────────────────┐
+│ ✅ https://t.me/your_channel    │
+│ ✅ https://t.me/joinchat/xxxxx  │
+│ ✅ @your_channel_name           │
+│ ✅ your_channel_name            │
+└─────────────────────────────────┘
 
-⚠️ **Note:**
-• All system accounts will automatically join this channel
-• Both public and private channels are supported
-• Make sure the channel allows new members
+🚀 **Professional Features:**
+• 🤖 **Auto-join** with all premium accounts
+• 🔒 **Public & private** channel support  
+• ⚡ **Instant** integration process
 
-Send the channel link or /cancel to abort.
+💬 **Send your channel link or type /cancel to exit**
         """
         
         if callback_query.message:
@@ -535,12 +550,22 @@ Send message IDs or "auto", or /cancel to abort.
             delay_range = Utils.get_delay_range(delay_level)
             
             text = f"""
-⚙️ **Settings**
+⚙️ **Advanced Configuration**
 
-⏱️ **Boost Delay:**
-Currently: {delay_level.title()} ({delay_range[0]}-{delay_range[1]}s)
+┌──── ⏱️ **Performance Settings** ────┐
+│ 
+│ 🎯 **Boost Timing:**
+│ → Current: {delay_level.title()} Speed
+│ → Interval: {delay_range[0]}-{delay_range[1]} seconds
+│ 
+│ 🤖 **Smart Automation:**
+│ → Account Rotation: ✅ Active
+│ → Message Reading: ✅ Enabled
+│ → Performance Mode: 🚀 Optimized
+│
+└────────────────────────────────────┘
 
-The bot automatically handles account rotation and reading for optimal performance.
+💡 **Tip:** Our AI manages accounts automatically for maximum efficiency
             """
             
             if callback_query.message:
@@ -561,15 +586,30 @@ The bot automatically handles account rotation and reading for optimal performan
         
         if data == "setting_delay":
             text = """
-⏱️ **Boost Delay Settings**
+⚡ **Performance Optimization Center**
 
-Choose delay between account operations:
+┌──── 🎯 **Speed Configuration** ────┐
+│
+│ Choose your preferred performance level:
+│
+└───────────────────────────────────┘
 
-🐇 **Low (1-2s)**: Fast boosting, higher chance of flood wait
-🚶 **Medium (2-5s)**: Balanced speed and safety (recommended)  
-🐢 **High (5-10s)**: Slower but safer, less chance of limits
+🚀 **Fast Mode (1-2s)**
+   → Maximum speed delivery
+   → Higher engagement rate
+   → Ideal for trending content
 
-Current setting will be highlighted.
+⚡ **Balanced Mode (2-5s)** ⭐ **Recommended**
+   → Optimal speed vs safety ratio
+   → Best overall performance
+   → Professional standard
+
+🛡️ **Safe Mode (5-10s)**
+   → Maximum account protection
+   → Conservative approach
+   → Long-term stability focus
+
+💡 **Pro Tip:** Balanced mode offers the best results for most campaigns
             """
             
             if callback_query.message:
@@ -597,7 +637,12 @@ Current setting will be highlighted.
         delay_level = delay_map.get(data)
         if delay_level:
             await self.update_user_setting(user_id, "delay_level", delay_level)
-            await callback_query.answer(f"✅ Delay set to {delay_level}")
+            responses = {
+                "low": "🚀 Fast Mode activated - Maximum speed enabled!",
+                "medium": "⚡ Balanced Mode activated - Optimal performance!", 
+                "high": "🛡️ Safe Mode activated - Maximum protection!"
+            }
+            await callback_query.answer(responses.get(delay_level, "✨ Settings updated!"))
             await self.show_settings(callback_query)
     
     async def show_channel_info(self, callback_query: types.CallbackQuery, data: str):
@@ -620,20 +665,24 @@ Current setting will be highlighted.
             last_boosted = Utils.format_datetime(channel.get("last_boosted"))
             
             text = f"""
-📢 **Channel Info**
+📢 **Channel Intelligence**
 
-**Name:** {name}
-**Link:** {Utils.truncate_text(link, 50)}
+┌──── 🎯 **Channel Profile** ────┐
+│ Name: {name}
+│ Link: {Utils.truncate_text(link, 50)}
+└───────────────────────────────┘
 
-📊 **Statistics:**
-Total Boosts: {total_boosts:,}
-Added: {created}
-Last Boosted: {last_boosted}
+📊 **Performance Analytics:**
+┌─────────────────────────────┐
+│ 🚀 Total Boosts: {total_boosts:,}
+│ 📅 Added: {created}
+│ ⚡ Last Boost: {last_boosted}
+└─────────────────────────────┘
 
-**Available Actions:**
-• Instant boost this channel
-• View boost statistics
-• Remove channel
+🎮 **Available Operations:**
+• ⚡ Instant boost campaign
+• 📊 Advanced analytics
+• 🗑️ Remove from system
             """
             
             await callback_query.message.edit_text(
@@ -756,7 +805,7 @@ Last Boosted: {last_boosted}
     async def cancel_operation(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Cancel current operation"""
         await state.clear()
-        await callback_query.answer("❌ Operation cancelled")
+        await callback_query.answer("✨ Operation cancelled successfully")
         await self.show_user_panel(callback_query)
     
     async def get_user_setting(self, user_id: int, setting_name: str) -> any:
