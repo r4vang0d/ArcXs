@@ -1,0 +1,95 @@
+Build me a Telegram bot using Aiogram + Telethon that works on both Windows and Linux (no Docker, just Python).
+All secrets (BOT_TOKEN, ADMIN_IDS, API_ID, API_HASH) must be stored in a .env file and loaded via python-dotenv.
+
+🔑 Features:
+
+Admin Panel (accessible only to admins from .env):
+
+Add account (via phone login, save Telethon session).
+
+Remove account.
+
+List accounts with health (active, banned, floodwait).
+
+Logs of joins, boosts, failures.
+
+Notifications when account fails, floodwait, or gets banned.
+
+
+User Panel:
+
+Add channel (via link, public or private).
+
+All system accounts must join the channel automatically.
+
+Free users: 1 channel, Premium: multiple channels.
+
+Trigger Boost:
+
+Increment views using:
+
+result = await client(GetMessagesViewsRequest(peer=group, id=ids, increment=True))
+print("Views updated:", result.views)
+
+Also mark messages as read:
+
+await client.send_read_acknowledge(group, ids)
+
+Must support:
+
+Instant Boost.
+
+Scheduled Boost (optional).
+
+Retry on failure, then failover to another account.
+
+
+
+Stats command showing boost results.
+
+Settings command with options:
+
+Views Only OR Views + Mark as Read.
+
+Account rotation ON/OFF.
+
+Delay between boosts: Low/Medium/High.
+
+
+
+UI:
+
+Use inline keyboards (beautiful, modern).
+
+Clean menus for user & admin.
+
+Example:
+
+User: ➕ Add Channel, 📊 My Stats, ⚡ Boost Views, ⚙ Settings
+
+Admin: 📱 Manage Accounts, 📊 Logs, ❌ Failed Joins, 🚫 Banned Accounts
+
+
+
+Database:
+
+users (id, premium, expiry).
+
+accounts (phone, session, status).
+
+channels (id, link, user_id).
+
+logs (type, account_id, channel_id, message, time).
+
+
+Extra Requirements:
+
+All accounts rotate when boosting, with random low delay.
+
+If account fails → retry once → failover → notify admin.
+
+Optional scheduled boost (but instant must always work).
+
+On boost, both views increment + mark as read must always happen.
+
+Must run on Windows & Linux with python main.py.
