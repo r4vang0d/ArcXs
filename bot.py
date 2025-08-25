@@ -57,16 +57,8 @@ class ViewBoosterBot:
         # Callback handlers
         self.dp.callback_query.register(self.handle_callback)
         
-        # Admin message handlers (priority for admin operations)
-        self.dp.message.register(self.admin_handler.handle_message,
-                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
-        
-        # User message handlers (for channel addition, FSM states, etc.)
-        self.dp.message.register(self.user_handler.handle_message,
-                               lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
-        
-        # General message handler (for phone input and other states)
-        self.dp.message.register(self.handle_phone_input, 
+        # All text message handling in one place to avoid conflicts
+        self.dp.message.register(self.handle_text_message, 
                                lambda message: message.text and not message.text.startswith('/') and self.config.is_admin(message.from_user.id))
     
     async def start_command(self, message: types.Message):
@@ -234,19 +226,30 @@ class ViewBoosterBot:
             logger.error(f"Error handling callback {data}: {e}")
             await callback_query.answer("❌ An error occurred. Please try again.", show_alert=True)
     
-    async def handle_phone_input(self, message: types.Message, state: FSMContext):
-        """Handle text input (for FSM states)"""
+    async def handle_text_message(self, message: types.Message, state: FSMContext):
+        """Handle all text input routing to appropriate handlers"""
         if not message.from_user:
             return
         user_id = message.from_user.id
         
-        # Check if this is admin input
-        if self.config.is_admin(user_id):
-            await self.admin_handler.handle_message(message, state)
-            return
-        
-        # Handle user input for personal use
-        await self.user_handler.handle_message(message, state)
+        try:
+            current_state = await state.get_state()
+            logger.info(f"Text message received from {user_id}, current state: {current_state}")
+            
+            # Route to appropriate handler based on state and message content
+            if current_state and current_state.startswith('UserStates:'):
+                # User FSM states (channel addition, etc.)
+                await self.user_handler.handle_message(message, state)
+            elif current_state and current_state.startswith('AdminStates:'):
+                # Admin FSM states (account management, etc.)
+                await self.admin_handler.handle_message(message, state)
+            else:
+                # Default: try user handler first, then admin
+                await self.user_handler.handle_message(message, state)
+                
+        except Exception as e:
+            logger.error(f"Error routing text message: {e}")
+            await message.answer("❌ An error occurred processing your message. Please try again.")
     
     async def start(self):
         """Start the bot"""
