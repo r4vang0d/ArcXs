@@ -46,7 +46,7 @@ class UserHandler:
         if data == "main_menu":
             await self.show_main_menu(callback_query)
         elif data == "user_panel":
-            await self.show_user_panel(callback_query)
+            await self.show_personal_dashboard(callback_query)
         elif data == "add_channel":
             await self.start_add_channel(callback_query, state)
         elif data == "my_channels":
@@ -111,8 +111,8 @@ class UserHandler:
             )
         await callback_query.answer()
     
-    async def show_user_panel(self, callback_query: types.CallbackQuery):
-        """Show user panel"""
+    async def show_personal_dashboard(self, callback_query: types.CallbackQuery):
+        """Show personal dashboard"""
         user_id = callback_query.from_user.id
         
         # Get user stats
@@ -134,7 +134,7 @@ class UserHandler:
         if callback_query.message:
             await callback_query.message.edit_text(
                 panel_text,
-                reply_markup=BotKeyboards.user_panel(),
+                reply_markup=BotKeyboards.main_menu(True),
                 parse_mode="Markdown"
             )
         await callback_query.answer()
@@ -186,7 +186,7 @@ class UserHandler:
         if channel_link == "/cancel":
             await state.clear()
             await message.answer("❌ Operation cancelled", 
-                               reply_markup=BotKeyboards.user_panel())
+                               reply_markup=BotKeyboards.main_menu(True))
             return
         
         if not Utils.is_valid_telegram_link(channel_link):
@@ -225,21 +225,21 @@ class UserHandler:
                     await message.answer(
                         f"✅ **Channel Added Successfully!**\n\n{join_message}\n\n" +
                         "You can now boost views for this channel.",
-                        reply_markup=BotKeyboards.user_panel(),
+                        reply_markup=BotKeyboards.main_menu(True),
                         parse_mode="Markdown"
                     )
                 else:
                     await processing_msg.delete()
                     await message.answer(
                         "⚠️ Channel joined but failed to save to database. Please try again.",
-                        reply_markup=BotKeyboards.user_panel()
+                        reply_markup=BotKeyboards.main_menu(True)
                     )
             else:
                 await processing_msg.delete()
                 await message.answer(
                     f"❌ **Failed to Add Channel**\n\n{join_message}\n\n" +
                     "Please check the channel link and try again.",
-                    reply_markup=BotKeyboards.user_panel(),
+                    reply_markup=BotKeyboards.main_menu(True),
                     parse_mode="Markdown"
                 )
         
@@ -248,7 +248,7 @@ class UserHandler:
             logger.error(f"Error adding channel: {e}")
             await message.answer(
                 "❌ An error occurred while adding the channel. Please try again.",
-                reply_markup=BotKeyboards.user_panel()
+                reply_markup=BotKeyboards.main_menu(True)
             )
         
         await state.clear()
@@ -323,7 +323,7 @@ Total Boosts: {total_boosts:,}
         if callback_query.message:
             await callback_query.message.edit_text(
                 stats_text,
-                reply_markup=BotKeyboards.back_button("user_panel"),
+                reply_markup=BotKeyboards.back_button("main_menu"),
                 parse_mode="Markdown"
             )
         await callback_query.answer()
@@ -364,7 +364,7 @@ Choose a channel below:
                 )
             ])
         
-        buttons.append([types.InlineKeyboardButton(text="🔙 User Panel", callback_data="user_panel")])
+        buttons.append([types.InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")])
         
         keyboard = types.InlineKeyboardMarkup(inline_keyboard=buttons)
         
@@ -438,7 +438,7 @@ Send message IDs or "auto", or /cancel to abort.
         if input_text == "/cancel":
             await state.clear()
             await message.answer("❌ Operation cancelled",
-                               reply_markup=BotKeyboards.user_panel())
+                               reply_markup=BotKeyboards.main_menu(True))
             return
         
         # Get state data
@@ -448,7 +448,7 @@ Send message IDs or "auto", or /cancel to abort.
         
         if not channel_id or not channel_link:
             await message.answer("❌ Session expired. Please try again.",
-                               reply_markup=BotKeyboards.user_panel())
+                               reply_markup=BotKeyboards.main_menu(True))
             await state.clear()
             return
         
@@ -496,13 +496,13 @@ Send message IDs or "auto", or /cancel to abort.
                 await message.answer(
                     f"✅ **Boost Completed!**\n\n{boost_message}\n\n" +
                     f"Message IDs: {', '.join(map(str, message_ids))}",
-                    reply_markup=BotKeyboards.user_panel(),
+                    reply_markup=BotKeyboards.main_menu(True),
                     parse_mode="Markdown"
                 )
             else:
                 await message.answer(
                     f"❌ **Boost Failed**\n\n{boost_message}",
-                    reply_markup=BotKeyboards.user_panel(),
+                    reply_markup=BotKeyboards.main_menu(True),
                     parse_mode="Markdown"
                 )
         
@@ -511,7 +511,7 @@ Send message IDs or "auto", or /cancel to abort.
             logger.error(f"Error boosting messages: {e}")
             await message.answer(
                 "❌ An error occurred during boost. Please try again.",
-                reply_markup=BotKeyboards.user_panel()
+                reply_markup=BotKeyboards.main_menu(True)
             )
         
         await state.clear()
@@ -789,7 +789,7 @@ Last Boosted: {last_boosted}
         """Cancel current operation"""
         await state.clear()
         await callback_query.answer("✨ Operation cancelled successfully")
-        await self.show_user_panel(callback_query)
+        await self.show_personal_dashboard(callback_query)
     
     async def get_user_setting(self, user_id: int, setting_name: str) -> any:
         """Get user setting value"""

@@ -666,7 +666,7 @@ Choose log type to view:
         if callback_query.message:
             await callback_query.message.edit_text(
                 text,
-                reply_markup=BotKeyboards.back_button("admin_panel"),
+                reply_markup=BotKeyboards.back_button("main_menu"),
                 parse_mode="Markdown"
             )
         await callback_query.answer()
@@ -690,7 +690,7 @@ Choose log type to view:
         
         await callback_query.message.edit_text(
             text,
-            reply_markup=BotKeyboards.back_button("admin_panel"),
+            reply_markup=BotKeyboards.back_button("main_menu"),
             parse_mode="Markdown"
         )
         await callback_query.answer()
@@ -731,7 +731,7 @@ Health Score: {health_percentage:.1f}%
         
         await callback_query.message.edit_text(
             text,
-            reply_markup=BotKeyboards.back_button("admin_panel"),
+            reply_markup=BotKeyboards.back_button("main_menu"),
             parse_mode="Markdown"
         )
         await callback_query.answer()

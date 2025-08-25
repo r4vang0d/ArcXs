@@ -99,7 +99,7 @@ class ViewBoosterBot:
         
         await message.answer(
             welcome_text,
-            reply_markup=BotKeyboards.personal_main_menu(),
+            reply_markup=BotKeyboards.main_menu(True),
             parse_mode="Markdown"
         )
     
