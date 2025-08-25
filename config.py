@@ -5,8 +5,8 @@ import os
 from typing import List
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (optional for .env file)
+load_dotenv(verbose=False)
 
 class Config:
     """Configuration class for bot settings"""
@@ -15,13 +15,13 @@ class Config:
         # Telegram Bot Configuration
         self.BOT_TOKEN = os.getenv("BOT_TOKEN")
         if not self.BOT_TOKEN:
-            raise ValueError("BOT_TOKEN is required in .env file")
+            raise ValueError("BOT_TOKEN is required in environment variables")
         
         # Telegram API Configuration
         self.API_ID = os.getenv("API_ID")
         self.API_HASH = os.getenv("API_HASH")
         if not self.API_ID or not self.API_HASH:
-            raise ValueError("API_ID and API_HASH are required in .env file")
+            raise ValueError("API_ID and API_HASH are required in environment variables")
         
         try:
             self.API_ID = int(self.API_ID)
@@ -38,7 +38,7 @@ class Config:
                 raise ValueError("ADMIN_IDS must be comma-separated integers")
         
         if not self.ADMIN_IDS:
-            raise ValueError("At least one ADMIN_ID is required in .env file")
+            raise ValueError("At least one ADMIN_ID is required in environment variables")
         
         # Database Configuration
         self.DATABASE_PATH = os.getenv("DATABASE_PATH", "bot_data.db")

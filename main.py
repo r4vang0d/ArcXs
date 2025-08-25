@@ -47,10 +47,5 @@ async def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    # Check for .env file
-    if not os.path.exists('.env'):
-        logger.error("No .env file found! Please copy .env.example to .env and fill in your values.")
-        sys.exit(1)
-    
     # Run the bot
     asyncio.run(main())
