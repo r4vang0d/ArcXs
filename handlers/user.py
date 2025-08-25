@@ -959,6 +959,7 @@ Select a channel below to start:
     async def handle_auto_count_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle auto message count setting changes"""
         user_id = callback_query.from_user.id
+        logger.info(f"🔧 DEBUG: Auto count setting called with data: {data} for user: {user_id}")
         
         count_map = {
             "auto_count_1": 1,
@@ -969,10 +970,14 @@ Select a channel below to start:
         }
         
         count = count_map.get(data)
+        logger.info(f"🔧 DEBUG: Count mapped to: {count}")
         if count:
-            await self.update_user_setting(user_id, "auto_message_count", count)
+            success = await self.update_user_setting(user_id, "auto_message_count", count)
+            logger.info(f"🔧 DEBUG: Setting update success: {success}")
             await callback_query.answer(f"✨ Auto message count set to {count} messages!")
             await self.show_settings(callback_query)
+        else:
+            logger.error(f"🔧 DEBUG: No count found for data: {data}")
     
     async def show_channel_info(self, callback_query: types.CallbackQuery, data: str):
         """Show detailed channel information"""
@@ -1141,10 +1146,15 @@ Last Boosted: {last_boosted}
         """Get user setting value"""
         user = await self.db.get_user(user_id)
         if not user:
+            logger.info(f"🔍 DEBUG: No user found for ID: {user_id}")
             return None
         
         settings = Utils.parse_user_settings(user.get("settings", "{}"))
-        return settings.get(setting_name)
+        setting_value = settings.get(setting_name)
+        logger.info(f"🔍 DEBUG: Retrieved {setting_name} = {setting_value} for user {user_id}")
+        if setting_name == "auto_message_count":
+            logger.info(f"🔍 DEBUG: Full settings for user {user_id}: {settings}")
+        return setting_value
     
     async def update_user_setting(self, user_id: int, setting_name: str, value: any) -> bool:
         """Update user setting"""
