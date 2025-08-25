@@ -168,27 +168,25 @@ class UserHandler:
         
         # Personal use - no limits
         
-        text = """
-🎯 **Add New Channel**
+        text = """🎯 Add New Channel
 
-**How it works:**
+How it works:
 1. Send your Telegram channel link
 2. System will automatically join with accounts
 3. Start boosting views instantly!
 
-**Accepted formats:**
+Accepted formats:
 • https://t.me/your_channel
 • https://t.me/joinchat/xxxxx
 • @your_channel_name
 • your_channel_name
 
-**Features:**
+Features:
 • Auto-join with all accounts
 • Public and private channel support
 • Instant integration
 
-💬 **Send your channel link or type /cancel to exit**
-        """
+💬 Send your channel link or type /cancel to exit"""
         
         try:
             if callback_query.message:
