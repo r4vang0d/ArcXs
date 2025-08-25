@@ -21,7 +21,8 @@ class BotKeyboards:
              InlineKeyboardButton(text="💚 System Health", callback_data="admin_health")],
             [InlineKeyboardButton(text="🔴 Live Management", callback_data="live_management"),
              InlineKeyboardButton(text="📊 System Logs", callback_data="admin_logs")],
-            [InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
+            [InlineKeyboardButton(text="🗳️ Poll Manager", callback_data="poll_manager"),
+             InlineKeyboardButton(text="⚙️ Settings", callback_data="settings")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
@@ -247,4 +248,39 @@ class BotKeyboards:
         buttons.append([
             InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
         ])
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def poll_management() -> InlineKeyboardMarkup:
+        """Poll Management keyboard"""
+        buttons = [
+            [InlineKeyboardButton(text="🗳️ Start Poll Voting", callback_data="start_poll_voting")],
+            [InlineKeyboardButton(text="📋 Poll History", callback_data="poll_history")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
+        ]
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def poll_options(poll_data: dict) -> InlineKeyboardMarkup:
+        """Generate keyboard for poll options"""
+        buttons = []
+        
+        if 'options' in poll_data:
+            for i, option in enumerate(poll_data['options']):
+                option_text = option.get('text', f'Option {i+1}')
+                if len(option_text) > 30:
+                    option_text = option_text[:27] + "..."
+                
+                buttons.append([
+                    InlineKeyboardButton(
+                        text=f"🗳️ {option_text}",
+                        callback_data=f"vote_option:{i}"
+                    )
+                ])
+        
+        buttons.append([
+            InlineKeyboardButton(text="🔙 Back", callback_data="poll_manager"),
+            InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
+        ])
+        
         return InlineKeyboardMarkup(inline_keyboard=buttons)

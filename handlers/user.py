@@ -25,6 +25,8 @@ class UserStates(StatesGroup):
     waiting_for_message_ids = State()
     waiting_for_reaction_message_ids = State()
     waiting_for_live_channel = State()
+    waiting_for_poll_url = State()
+    waiting_for_poll_choice = State()
 
 class UserHandler:
     """Handles user-specific operations"""
@@ -79,6 +81,14 @@ class UserHandler:
             await self.start_live_monitoring(callback_query)
         elif data == "stop_live_monitor":
             await self.stop_live_monitoring(callback_query)
+        elif data == "poll_manager":
+            await self.show_poll_manager(callback_query)
+        elif data == "start_poll_voting":
+            await self.start_poll_voting(callback_query, state)
+        elif data == "poll_history":
+            await self.show_poll_history(callback_query)
+        elif data.startswith("vote_option:"):
+            await self.execute_poll_vote(callback_query, data)
         elif data.startswith("channel_info:"):
             await self.show_channel_info(callback_query, data)
         elif data.startswith("remove_channel:"):
@@ -116,6 +126,8 @@ class UserHandler:
                 await self.process_reaction_messages(message, state)
             elif current_state == UserStates.waiting_for_live_channel.state:
                 await self.process_live_channel(message, state)
+            elif current_state == UserStates.waiting_for_poll_url.state:
+                await self.process_poll_url(message, state)
             else:
                 logger.info(f"No handler for state: {current_state}")
         except Exception as e:
@@ -1532,3 +1544,322 @@ You can restart monitoring anytime by clicking "Start Monitoring"."""
             text,
             reply_markup=BotKeyboards.live_management()
         )
+    
+    # Poll Management Functions
+    async def show_poll_manager(self, callback_query: types.CallbackQuery):
+        """Show poll management menu"""
+        try:
+            text = """
+🗳️ **Poll Manager**
+
+Automatically vote in Telegram polls using your accounts.
+
+**How it works:**
+1. Get the poll URL/link from Telegram
+2. Select which option to vote for
+3. Bot uses all your accounts to vote
+
+**Supported:**
+• Channel polls
+• Group polls 
+• Public polls
+• Private polls (if accounts are members)
+
+Choose an option below:
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.poll_management(),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error showing poll manager: {e}")
+            await callback_query.answer("❌ Error loading poll manager", show_alert=True)
+    
+    async def start_poll_voting(self, callback_query: types.CallbackQuery, state: FSMContext):
+        """Start poll voting process"""
+        try:
+            text = """
+🗳️ **Start Poll Voting**
+
+Please send me the poll URL or forward the poll message.
+
+**Supported formats:**
+• `https://t.me/channel/123`
+• `https://t.me/c/123456789/123`
+• Forward the poll message directly
+
+**Note:** Your accounts must have access to the channel/group containing the poll.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.cancel_operation(),
+                parse_mode="Markdown"
+            )
+            await state.set_state(UserStates.waiting_for_poll_url)
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error starting poll voting: {e}")
+            await callback_query.answer("❌ Error starting poll voting", show_alert=True)
+    
+    async def process_poll_url(self, message: types.Message, state: FSMContext):
+        """Process poll URL and fetch poll data"""
+        try:
+            # Handle forwarded poll message
+            if message.forward_from_chat or message.poll:
+                if message.poll:
+                    # Direct poll message
+                    poll_data = await self.extract_poll_data_from_message(message)
+                    if poll_data:
+                        await self.show_poll_options(message, poll_data, state)
+                        return
+                else:
+                    await message.answer("❌ This appears to be a forwarded message but no poll was detected.")
+                    return
+            
+            # Handle URL input
+            if message.text:
+                poll_url = message.text.strip()
+                
+                # Validate URL format
+                if not self.is_valid_telegram_url(poll_url):
+                    await message.answer(
+                        "❌ **Invalid URL format**\n\n"
+                        "Please send a valid Telegram link like:\n"
+                        "• `https://t.me/channel/123`\n"
+                        "• `https://t.me/c/123456789/123`\n"
+                        "• Or forward the poll message directly",
+                        parse_mode="Markdown"
+                    )
+                    return
+                
+                # Try to fetch poll from URL
+                poll_data = await self.fetch_poll_from_url(poll_url)
+                if poll_data:
+                    await self.show_poll_options(message, poll_data, state)
+                else:
+                    await message.answer(
+                        "❌ **Poll not found**\n\n"
+                        "Could not find a poll at that URL. Make sure:\n"
+                        "• The URL is correct\n" 
+                        "• Your accounts have access to the channel\n"
+                        "• The message contains a poll",
+                        parse_mode="Markdown"
+                    )
+            else:
+                await message.answer("❌ Please send a valid poll URL or forward a poll message.")
+                
+        except Exception as e:
+            logger.error(f"Error processing poll URL: {e}")
+            await message.answer("❌ Error processing poll URL. Please try again.")
+    
+    async def show_poll_options(self, message: types.Message, poll_data: dict, state: FSMContext):
+        """Show poll options for voting"""
+        try:
+            poll_question = poll_data.get('question', 'Poll')
+            if len(poll_question) > 100:
+                poll_question = poll_question[:97] + "..."
+            
+            options_text = ""
+            for i, option in enumerate(poll_data.get('options', [])):
+                option_text = option.get('text', f'Option {i+1}')
+                voter_count = option.get('voter_count', 0)
+                options_text += f"{i+1}. {option_text} ({voter_count} votes)\n"
+            
+            text = f"""
+🗳️ **Poll Found!**
+
+**Question:** {poll_question}
+
+**Options:**
+{options_text}
+
+**Accounts available:** {len(self.telethon.active_clients)}
+
+Select which option you want to vote for:
+            """
+            
+            # Store poll data in state
+            await state.update_data(poll_data=poll_data)
+            await state.set_state(UserStates.waiting_for_poll_choice)
+            
+            await message.answer(
+                text,
+                reply_markup=BotKeyboards.poll_options(poll_data),
+                parse_mode="Markdown"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error showing poll options: {e}")
+            await message.answer("❌ Error displaying poll options")
+    
+    async def execute_poll_vote(self, callback_query: types.CallbackQuery, data: str):
+        """Execute poll voting with all accounts"""
+        try:
+            # Extract option index from callback data
+            option_index = int(data.split(":")[1])
+            
+            # Get poll data from state
+            from aiogram.fsm.context import FSMContext
+            from aiogram.dispatcher.event.context import Context
+            
+            context = Context()
+            state = FSMContext(
+                storage=callback_query.bot.dispatcher.storage,  
+                key=callback_query.bot.dispatcher.storage.build_key(
+                    chat=callback_query.message.chat.id,
+                    user=callback_query.from_user.id
+                )
+            )
+            state_data = await state.get_data()
+            poll_data = state_data.get('poll_data', {})
+            
+            if not poll_data:
+                await callback_query.answer("❌ Poll data not found. Please try again.", show_alert=True)
+                return
+            
+            selected_option = poll_data['options'][option_index]
+            option_text = selected_option.get('text', f'Option {option_index + 1}')
+            
+            # Show voting progress
+            progress_text = f"""
+🗳️ **Starting Poll Vote**
+
+**Selected option:** {option_text}
+**Available accounts:** {len(self.telethon.active_clients)}
+
+⏳ **Voting in progress...**
+This may take a few moments.
+            """
+            
+            await callback_query.message.edit_text(
+                progress_text,
+                parse_mode="Markdown"
+            )
+            
+            # Execute voting with all accounts
+            vote_result = await self.telethon.vote_in_poll(
+                poll_data['message_url'],
+                poll_data['message_id'], 
+                option_index
+            )
+            
+            # Show results
+            success_count = vote_result.get('successful_votes', 0)
+            total_accounts = vote_result.get('total_accounts', 0)
+            failed_accounts = vote_result.get('failed_accounts', [])
+            
+            result_text = f"""
+✅ **Poll Voting Complete!**
+
+**Selected option:** {option_text}
+**Successful votes:** {success_count}/{total_accounts}
+"""
+            
+            if failed_accounts:
+                result_text += f"**Failed accounts:** {len(failed_accounts)}\n"
+                if len(failed_accounts) <= 5:
+                    result_text += f"**Failed:** {', '.join(failed_accounts[:5])}\n"
+            
+            result_text += "\n🎉 All available accounts have voted!"
+            
+            await callback_query.message.edit_text(
+                result_text,
+                reply_markup=BotKeyboards.poll_management(),
+                parse_mode="Markdown"
+            )
+            
+            # Clear state
+            await state.clear()
+            await callback_query.answer("✅ Voting completed!")
+            
+        except Exception as e:
+            logger.error(f"Error executing poll vote: {e}")
+            await callback_query.answer("❌ Error voting in poll. Please try again.", show_alert=True)
+    
+    async def show_poll_history(self, callback_query: types.CallbackQuery):
+        """Show poll voting history"""
+        try:
+            text = """
+📋 **Poll History**
+
+*This feature will show your recent poll voting activity.*
+
+**Coming Soon:**
+• View recent poll votes
+• Vote statistics  
+• Success/failure rates
+• Account performance
+
+For now, all poll votes are logged in the system logs.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.back_button("poll_manager"),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error showing poll history: {e}")
+            await callback_query.answer("❌ Error loading poll history", show_alert=True)
+    
+    # Helper functions for poll management
+    def is_valid_telegram_url(self, url: str) -> bool:
+        """Check if URL is a valid Telegram URL"""
+        telegram_patterns = [
+            r'https://t\.me/\w+/\d+',
+            r'https://t\.me/c/\d+/\d+',
+            r'https://telegram\.me/\w+/\d+'
+        ]
+        
+        import re
+        for pattern in telegram_patterns:
+            if re.match(pattern, url):
+                return True
+        return False
+    
+    async def extract_poll_data_from_message(self, message: types.Message) -> dict:
+        """Extract poll data from a message"""
+        try:
+            if not message.poll:
+                return None
+            
+            poll = message.poll
+            poll_data = {
+                'question': poll.question,
+                'options': [],
+                'message_id': message.message_id,
+                'message_url': f"https://t.me/c/{message.chat.id}/{message.message_id}",
+                'is_anonymous': poll.is_anonymous,
+                'allows_multiple_answers': poll.allows_multiple_answers
+            }
+            
+            for option in poll.options:
+                poll_data['options'].append({
+                    'text': option.text,
+                    'voter_count': option.voter_count
+                })
+            
+            return poll_data
+            
+        except Exception as e:
+            logger.error(f"Error extracting poll data from message: {e}")
+            return None
+    
+    async def fetch_poll_from_url(self, url: str) -> dict:
+        """Fetch poll data from Telegram URL"""
+        try:
+            # Use Telethon to fetch the message and extract poll
+            poll_data = await self.telethon.get_poll_from_url(url)
+            return poll_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching poll from URL {url}: {e}")
+            return None

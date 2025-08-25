@@ -832,6 +832,208 @@ class TelethonManager:
             logger.error(f"Error joining live stream: {e}")
             return {"success": False, "message": f"Error: {e}", "accounts_joined": 0}
 
+    async def get_poll_from_url(self, url: str) -> dict:
+        """Fetch poll data from Telegram URL"""
+        try:
+            if not self.active_clients:
+                return None
+                
+            # Use first available client to fetch poll
+            client_name = list(self.active_clients)[0]
+            client = self.clients[client_name]
+            
+            # Extract channel and message ID from URL
+            channel_id, message_id = self.extract_channel_message_from_url(url)
+            if not channel_id or not message_id:
+                logger.error(f"Could not extract channel/message from URL: {url}")
+                return None
+            
+            # Get the entity and message
+            entity = await client.get_entity(channel_id)
+            message = await client.get_messages(entity, ids=message_id)
+            
+            if not message or not hasattr(message, 'media') or not message.media:
+                logger.error("No poll found in message")
+                return None
+            
+            # Check if message contains a poll
+            from telethon.tl.types import MessageMediaPoll
+            if not isinstance(message.media, MessageMediaPoll):
+                logger.error("Message does not contain a poll")
+                return None
+            
+            poll = message.media.poll
+            poll_data = {
+                'question': poll.question,
+                'options': [],
+                'message_id': message_id,
+                'message_url': url,
+                'channel_id': channel_id,
+                'is_closed': poll.closed,
+                'multiple_choice': poll.multiple_choice
+            }
+            
+            # Extract poll options
+            for i, answer in enumerate(poll.answers):
+                option_data = {
+                    'text': answer.text,
+                    'option': answer.option,
+                    'voter_count': 0  # Will be updated when we get poll results
+                }
+                poll_data['options'].append(option_data)
+            
+            # Try to get poll results to show current vote counts
+            try:
+                from telethon.tl.functions.messages import GetPollResultsRequest
+                results = await client(GetPollResultsRequest(
+                    peer=entity,
+                    msg_id=message_id
+                ))
+                
+                if results.results and results.results.results:
+                    for i, result in enumerate(results.results.results):
+                        if i < len(poll_data['options']):
+                            poll_data['options'][i]['voter_count'] = result.voters
+                            
+            except Exception as e:
+                logger.warning(f"Could not get poll results: {e}")
+            
+            logger.info(f"Successfully fetched poll: {poll_data['question']}")
+            return poll_data
+            
+        except Exception as e:
+            logger.error(f"Error fetching poll from URL {url}: {e}")
+            return None
+    
+    async def vote_in_poll(self, message_url: str, message_id: int, option_index: int) -> dict:
+        """Vote in a poll using all available accounts"""
+        try:
+            if not self.active_clients:
+                return {"success": False, "message": "No active accounts", "successful_votes": 0, "total_accounts": 0}
+            
+            # Extract channel ID from URL
+            channel_id, _ = self.extract_channel_message_from_url(message_url)
+            if not channel_id:
+                return {"success": False, "message": "Invalid message URL", "successful_votes": 0, "total_accounts": 0}
+            
+            successful_votes = 0
+            failed_accounts = []
+            total_accounts = len(self.active_clients)
+            
+            logger.info(f"Starting poll voting with {total_accounts} accounts for option {option_index}")
+            
+            for session_name in self.active_clients:
+                try:
+                    client = self.clients[session_name]
+                    
+                    # Get the entity
+                    entity = await client.get_entity(channel_id)
+                    
+                    # Get the message to verify it contains a poll
+                    message = await client.get_messages(entity, ids=message_id)
+                    if not message or not hasattr(message, 'media'):
+                        logger.error(f"Message {message_id} not found or has no media")
+                        failed_accounts.append(session_name)
+                        continue
+                    
+                    from telethon.tl.types import MessageMediaPoll
+                    if not isinstance(message.media, MessageMediaPoll):
+                        logger.error(f"Message {message_id} does not contain a poll")
+                        failed_accounts.append(session_name)
+                        continue
+                    
+                    poll = message.media.poll
+                    
+                    # Check if poll is closed
+                    if poll.closed:
+                        logger.warning(f"Poll is closed, cannot vote")
+                        failed_accounts.append(session_name)
+                        continue
+                    
+                    # Validate option index
+                    if option_index >= len(poll.answers):
+                        logger.error(f"Invalid option index {option_index}, poll has {len(poll.answers)} options")
+                        failed_accounts.append(session_name)
+                        continue
+                    
+                    # Get the option bytes
+                    selected_option = poll.answers[option_index].option
+                    
+                    # Vote in the poll
+                    from telethon.tl.functions.messages import SendVoteRequest
+                    await client(SendVoteRequest(
+                        peer=entity,
+                        msg_id=message_id,
+                        options=[selected_option]
+                    ))
+                    
+                    successful_votes += 1
+                    logger.info(f"✅ Account {session_name} voted successfully in poll")
+                    
+                    # Add small delay between votes
+                    await asyncio.sleep(1)
+                    
+                except Exception as vote_error:
+                    logger.error(f"Failed to vote with account {session_name}: {vote_error}")
+                    failed_accounts.append(session_name)
+            
+            success = successful_votes > 0
+            message = f"Poll voting completed: {successful_votes}/{total_accounts} accounts voted successfully"
+            
+            if failed_accounts:
+                message += f". Failed accounts: {', '.join(failed_accounts[:3])}"
+                if len(failed_accounts) > 3:
+                    message += f" and {len(failed_accounts) - 3} more"
+            
+            result = {
+                "success": success,
+                "message": message,
+                "successful_votes": successful_votes,
+                "total_accounts": total_accounts,
+                "failed_accounts": failed_accounts
+            }
+            
+            logger.info(f"Poll voting result: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error voting in poll: {e}")
+            return {
+                "success": False,
+                "message": f"Error: {e}",
+                "successful_votes": 0,
+                "total_accounts": len(self.active_clients) if self.active_clients else 0,
+                "failed_accounts": list(self.active_clients) if self.active_clients else []
+            }
+    
+    def extract_channel_message_from_url(self, url: str) -> tuple:
+        """Extract channel ID and message ID from Telegram URL"""
+        try:
+            import re
+            
+            # Pattern for t.me/c/channel_id/message_id
+            pattern1 = r'https://t\.me/c/(-?\d+)/(\d+)'
+            match1 = re.match(pattern1, url)
+            if match1:
+                channel_id = int(match1.group(1))
+                message_id = int(match1.group(2))
+                return channel_id, message_id
+            
+            # Pattern for t.me/channel_name/message_id
+            pattern2 = r'https://t\.me/([^/]+)/(\d+)'
+            match2 = re.match(pattern2, url)
+            if match2:
+                channel_name = match2.group(1)
+                message_id = int(match2.group(2))
+                return channel_name, message_id
+            
+            logger.error(f"Could not parse URL format: {url}")
+            return None, None
+            
+        except Exception as e:
+            logger.error(f"Error extracting channel/message from URL {url}: {e}")
+            return None, None
+
     async def cleanup(self):
         """Cleanup all clients on shutdown"""
         for client in self.clients.values():
