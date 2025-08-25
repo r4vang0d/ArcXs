@@ -163,14 +163,14 @@ class ViewBoosterBot:
         
         await message.answer(stats_text, parse_mode="Markdown")
     
-    async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext = None):
+    async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Handle all callback queries"""
-        user_id = callback_query.from_user.id
-        data = callback_query.data
+        user_id = callback_query.from_user.id if callback_query.from_user else 0
+        data = callback_query.data or ''
         
         try:
             # Admin handlers
-            if self.config.is_admin(user_id) and data.startswith(('admin_', 'add_account', 'remove_account', 'list_accounts', 'refresh_accounts')):
+            if self.config.is_admin(user_id) and data.startswith(('admin_', 'add_account', 'remove_account', 'list_accounts', 'refresh_accounts', 'api_default', 'api_custom', 'cancel_operation')):
                 await self.admin_handler.handle_callback(callback_query, state)
                 return
             
