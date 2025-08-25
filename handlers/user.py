@@ -844,11 +844,16 @@ Select a channel below to start:
             """
             
             if callback_query.message:
-                await callback_query.message.edit_text(
-                    text,
-                    reply_markup=BotKeyboards.settings_menu(),
-                    parse_mode="Markdown"
-                )
+                try:
+                    await callback_query.message.edit_text(
+                        text,
+                        reply_markup=BotKeyboards.settings_menu(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    if "message is not modified" not in str(e):
+                        logger.error(f"Error editing settings message: {e}")
+                        raise e
             await callback_query.answer()
             
         except Exception as e:
