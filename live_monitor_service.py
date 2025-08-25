@@ -20,6 +20,7 @@ class LiveMonitorService:
         self.is_running = False
         self.monitor_task = None
         self.check_interval = 15  # Check every 15 seconds for faster detection
+        self.joined_calls = set()  # Track which group calls we've already joined
         
     async def start_monitoring(self):
         """Start the live monitoring service"""
@@ -95,8 +96,19 @@ class LiveMonitorService:
             if has_live:
                 logger.info(f"🔴 LIVE STREAM DETECTED in {channel_link}!")
                 
+                # Check if we've already joined this specific group call
+                call_id = group_call_info.get('id') if group_call_info else None
+                if call_id and call_id in self.joined_calls:
+                    logger.debug(f"Already attempted to join group call {call_id}, skipping...")
+                    await self.db.update_live_monitor_check(monitor_id, live_detected=True)
+                    return
+                
                 # Join the live stream with all accounts
                 result = await self.telethon.join_live_stream(channel_link, group_call_info)
+                
+                # Mark this group call as attempted (success or fail)
+                if call_id:
+                    self.joined_calls.add(call_id)
                 
                 if result['success']:
                     accounts_joined = result['accounts_joined']

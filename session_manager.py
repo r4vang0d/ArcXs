@@ -740,10 +740,21 @@ class TelethonManager:
                             
                             # Try to join the group call
                             from telethon.tl.types import DataJSON
+                            import random
+                            import json
+                            
                             me = await client.get_me()
                             
-                            # Create proper params for joining group call
-                            params = DataJSON(data='{"ufrag":"","pwd":""}')  # Basic WebRTC params
+                            # Generate proper WebRTC parameters with unique SSRC
+                            ssrc = random.randint(1000000, 9999999)
+                            webrtc_params = {
+                                "ufrag": f"tg{random.randint(100000, 999999)}",
+                                "pwd": f"pwd{random.randint(100000000, 999999999)}",
+                                "ssrc": ssrc,
+                                "ssrc-groups": [{"semantics": "FID", "ssrcs": [ssrc]}],
+                                "endpoint": "reflector-2.tgcalls.telegram.org"
+                            }
+                            params = DataJSON(data=json.dumps(webrtc_params))
                             
                             await client(JoinGroupCallRequest(
                                 call=group_call,
