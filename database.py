@@ -29,7 +29,8 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = "bot_data.db"):
         self.db_path = db_path
-        self._connection_lock = asyncio.Lock()
+        self._operation_lock = asyncio.Lock()
+        self._connection = None
     
     async def init_db(self):
         """Initialize database with required tables"""
@@ -101,27 +102,41 @@ class DatabaseManager:
             await db.commit()
             logger.info("Database initialized successfully")
     
-    async def get_connection(self):
-        """Get a database connection with proper locking"""
-        async with self._connection_lock:
-            connection = await aiosqlite.connect(self.db_path)
-            await connection.execute("PRAGMA journal_mode=WAL")
-            await connection.execute("PRAGMA synchronous=NORMAL") 
-            await connection.execute("PRAGMA cache_size=1000")
-            await connection.execute("PRAGMA temp_store=MEMORY")
-            return connection
+    async def _ensure_connection(self):
+        """Ensure we have a valid database connection"""
+        if self._connection is None:
+            self._connection = await aiosqlite.connect(self.db_path)
+            await self._connection.execute("PRAGMA journal_mode=WAL")
+            await self._connection.execute("PRAGMA synchronous=NORMAL") 
+            await self._connection.execute("PRAGMA cache_size=1000")
+            await self._connection.execute("PRAGMA temp_store=MEMORY")
+        return self._connection
+    
+    async def _execute_with_lock(self, query: str, params=None):
+        """Execute a query with proper locking"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            if params:
+                return await connection.execute(query, params)
+            else:
+                return await connection.execute(query)
+    
+    async def _commit_with_lock(self):
+        """Commit with proper locking"""
+        async with self._operation_lock:
+            connection = await self._ensure_connection()
+            await connection.commit()
     
     # User management
     async def add_user(self, user_id: int, premium: bool = False, expiry: Optional[datetime] = None) -> bool:
         """Add or update a user"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    INSERT OR REPLACE INTO users (id, premium, expiry)
-                    VALUES (?, ?, ?)
-                """, (user_id, premium, expiry))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                INSERT OR REPLACE INTO users (id, premium, expiry)
+                VALUES (?, ?, ?)
+            """, (user_id, premium, expiry))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error adding user {user_id}: {e}")
             return False
@@ -129,8 +144,9 @@ class DatabaseManager:
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user information"""
         try:
-            async with await self.get_connection() as db:
-                async with db.execute("""
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
                     SELECT id, premium, expiry, created_at, settings
                     FROM users WHERE id = ?
                 """, (user_id,)) as cursor:
@@ -164,14 +180,13 @@ class DatabaseManager:
     async def add_account(self, phone: str, session_name: str) -> bool:
         """Add a new Telethon account"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    INSERT INTO accounts (phone, session_name, status)
-                    VALUES (?, ?, ?)
-                """, (phone, session_name, AccountStatus.ACTIVE.value))
-                await db.commit()
-                await self.log_action(LogType.JOIN, message=f"Account {phone} added successfully")
-                return True
+            await self._execute_with_lock("""
+                INSERT INTO accounts (phone, session_name, status)
+                VALUES (?, ?, ?)
+            """, (phone, session_name, AccountStatus.ACTIVE.value))
+            await self._commit_with_lock()
+            await self.log_action(LogType.JOIN, message=f"Account {phone} added successfully")
+            return True
         except Exception as e:
             logger.error(f"Error adding account {phone}: {e}")
             return False
@@ -179,11 +194,10 @@ class DatabaseManager:
     async def remove_account(self, phone: str) -> bool:
         """Remove an account"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("DELETE FROM accounts WHERE phone = ?", (phone,))
-                await db.commit()
-                await self.log_action(LogType.JOIN, message=f"Account {phone} removed")
-                return True
+            await self._execute_with_lock("DELETE FROM accounts WHERE phone = ?", (phone,))
+            await self._commit_with_lock()
+            await self.log_action(LogType.JOIN, message=f"Account {phone} removed")
+            return True
         except Exception as e:
             logger.error(f"Error removing account {phone}: {e}")
             return False
@@ -191,8 +205,9 @@ class DatabaseManager:
     async def get_accounts(self) -> List[Dict[str, Any]]:
         """Get all accounts with their status"""
         try:
-            async with await self.get_connection() as db:
-                async with db.execute("""
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
                     SELECT id, phone, session_name, status, flood_wait_until, 
                            created_at, last_used, failed_attempts
                     FROM accounts ORDER BY created_at
@@ -219,8 +234,9 @@ class DatabaseManager:
         """Get only active accounts that can be used"""
         try:
             now = datetime.now()
-            async with await self.get_connection() as db:
-                async with db.execute("""
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
                     SELECT id, phone, session_name, status, flood_wait_until,
                            created_at, last_used, failed_attempts
                     FROM accounts 
@@ -353,13 +369,12 @@ class DatabaseManager:
                         channel_id: Optional[int] = None, user_id: Optional[int] = None, message: Optional[str] = None) -> bool:
         """Log an action to the database"""
         try:
-            async with await self.get_connection() as db:
-                await db.execute("""
-                    INSERT INTO logs (type, account_id, channel_id, user_id, message)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (log_type.value, account_id, channel_id, user_id, message))
-                await db.commit()
-                return True
+            await self._execute_with_lock("""
+                INSERT INTO logs (type, account_id, channel_id, user_id, message)
+                VALUES (?, ?, ?, ?, ?)
+            """, (log_type.value, account_id, channel_id, user_id, message))
+            await self._commit_with_lock()
+            return True
         except Exception as e:
             logger.error(f"Error logging action: {e}")
             return False
@@ -407,8 +422,9 @@ class DatabaseManager:
     async def get_user_count(self) -> int:
         """Get total user count"""
         try:
-            async with await self.get_connection() as db:
-                async with db.execute("SELECT COUNT(*) FROM users") as cursor:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("SELECT COUNT(*) FROM users") as cursor:
                     row = await cursor.fetchone()
                     return row[0] if row else 0
         except Exception as e:
