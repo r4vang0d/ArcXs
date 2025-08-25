@@ -347,15 +347,24 @@ class DatabaseManager:
             return False
     
     async def get_user_channels(self, user_id: int) -> List[Dict[str, Any]]:
-        """Get all channels for a user"""
+        """Get unique channels for a user (consolidated from all accounts)"""
         try:
             async with self._operation_lock:
                 connection = await self._ensure_connection()
                 async with connection.execute("""
-                    SELECT id, channel_link, channel_id, title, member_count,
-                           created_at, last_boosted, total_boosts
+                    SELECT 
+                        MIN(id) as id,
+                        channel_link, 
+                        channel_id, 
+                        title, 
+                        member_count,
+                        MIN(created_at) as created_at, 
+                        MAX(last_boosted) as last_boosted, 
+                        SUM(total_boosts) as total_boosts,
+                        COUNT(*) as account_count
                     FROM channels WHERE user_id = ?
-                    ORDER BY created_at DESC
+                    GROUP BY channel_link, channel_id
+                    ORDER BY MIN(created_at) DESC
                 """, (user_id,)) as cursor:
                     rows = await cursor.fetchall()
                     return [
@@ -367,12 +376,41 @@ class DatabaseManager:
                             "member_count": row[4],
                             "created_at": row[5],
                             "last_boosted": row[6],
-                            "total_boosts": row[7]
+                            "total_boosts": row[7] or 0,
+                            "account_count": row[8]
                         }
                         for row in rows
                     ]
         except Exception as e:
             logger.error(f"Error getting channels for user {user_id}: {e}")
+            return []
+    
+    async def get_channel_accounts(self, user_id: int, channel_link: str) -> List[Dict[str, Any]]:
+        """Get all accounts that joined a specific channel"""
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
+                    SELECT c.*, a.phone, a.username, a.session_name, a.status
+                    FROM channels c
+                    JOIN accounts a ON a.id = c.user_id OR a.phone IN (
+                        SELECT phone FROM accounts WHERE id = c.user_id
+                    )
+                    WHERE c.user_id = ? AND c.channel_link = ?
+                """, (user_id, channel_link)) as cursor:
+                    rows = await cursor.fetchall()
+                    return [
+                        {
+                            "channel_id": row[2],
+                            "phone": row[7],
+                            "username": row[8],
+                            "session_name": row[9],
+                            "status": row[10]
+                        }
+                        for row in rows
+                    ]
+        except Exception as e:
+            logger.error(f"Error getting channel accounts: {e}")
             return []
     
     async def update_channel_boost(self, channel_id: int, boost_count: int = 1) -> bool:

@@ -2,7 +2,16 @@
 
 This is a Telegram View Booster Bot built with Python using Aiogram and Telethon. The bot allows users to manage Telegram channels and boost message views through automated account operations. It features a dual-interface system with separate admin and user panels, account management capabilities, and comprehensive logging.
 
-The bot uses Aiogram for the main bot interface and Telethon for Telegram client operations like joining channels and boosting views. It supports both free and premium user tiers with different feature limitations.
+The bot uses Aiogram for the main bot interface and Telethon for Telegram client operations like joining channels and boosting views. **Recent Update**: Now shows unique channels (consolidated view) and automatically uses all available accounts in rotation for view boosting.
+
+# Recent Changes
+
+## August 25, 2025
+- **Fixed Channel Addition Bug**: Resolved critical issue where channel URLs weren't being processed due to missing message handler registration
+- **Implemented Consolidated Channel View**: Channels now display only once regardless of how many accounts joined them
+- **Enhanced Multi-Account Boosting**: View boosting now automatically uses ALL available accounts for maximum effectiveness
+- **Improved Channel Display**: Added account count indicator showing how many accounts joined each channel
+- **Enhanced Logging**: Added detailed message processing logs for better debugging
 
 # User Preferences
 

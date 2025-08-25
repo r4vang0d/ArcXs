@@ -309,10 +309,11 @@ Features:
             for channel in channels:
                 name = channel.get("title") or Utils.truncate_text(channel["channel_link"])
                 boosts = channel.get("total_boosts", 0)
+                account_count = channel.get("account_count", 1)
                 last_boosted = Utils.format_datetime(channel.get("last_boosted"))
                 
                 text += f"📢 **{name}**\n"
-                text += f"   ⚡ Boosts: {boosts}\n"
+                text += f"   ⚡ Boosts: {boosts} | 👥 Accounts: {account_count}\n"
                 text += f"   📅 Last: {last_boosted}\n\n"
         
         try:

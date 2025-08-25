@@ -327,7 +327,7 @@ class TelethonManager:
     async def boost_views(self, channel_link: str, message_ids: List[int], 
                          mark_as_read: bool = True) -> Tuple[bool, str, int]:
         """
-        Boost views for specific messages
+        Boost views for specific messages using ALL available accounts
         Returns (success, message, boost_count)
         """
         if not self.active_clients:
@@ -335,14 +335,19 @@ class TelethonManager:
         
         total_boosts = 0
         successful_accounts = 0
+        used_accounts = []
         
-        # Use all available accounts for boosting
-        for session_name in self.active_clients[:]:  # Copy list to avoid modification issues
+        # Use ALL available accounts for maximum boost effect
+        for session_name in list(self.active_clients.keys()):
+            if session_name in used_accounts:
+                continue
+                
             client_data = await self.get_next_available_client()
             if not client_data:
-                break
+                continue
                 
             client, account = client_data
+            used_accounts.append(session_name)
             
             try:
                 # Get channel entity
@@ -404,7 +409,8 @@ class TelethonManager:
                 )
         
         if total_boosts > 0:
-            return True, f"✅ Boosted views with {successful_accounts} accounts", total_boosts
+            total_accounts = len(self.active_clients)
+            return True, f"✅ Boosted {len(message_ids)} messages with {successful_accounts}/{total_accounts} accounts", total_boosts
         else:
             return False, "❌ No views were boosted", 0
     
