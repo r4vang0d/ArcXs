@@ -25,6 +25,7 @@ class AdminStates(StatesGroup):
     waiting_for_api_choice = State()
     waiting_for_custom_api_id = State()
     waiting_for_custom_api_hash = State()
+    waiting_for_verification_code = State()
 
 class AdminHandler:
     """Handles admin-specific operations"""
@@ -85,6 +86,8 @@ class AdminHandler:
             await self.process_custom_api_id(message, state)
         elif current_state == AdminStates.waiting_for_custom_api_hash.state:
             await self.process_custom_api_hash(message, state)
+        elif current_state == AdminStates.waiting_for_verification_code.state:
+            await self.process_verification_code(message, state)
     
     async def show_admin_panel(self, callback_query: types.CallbackQuery):
         """Show main admin panel"""
@@ -170,7 +173,7 @@ Choose your preferred method:
         await callback_query.answer()
     
     async def process_add_account(self, message: types.Message, state: FSMContext):
-        """Process add account with phone number"""
+        """Process add account with phone number - start verification"""
         phone = message.text.strip()
         
         if phone == "/cancel":
@@ -190,31 +193,114 @@ Choose your preferred method:
         api_hash = data.get("api_hash", self.config.DEFAULT_API_HASH)
         
         # Show processing message
-        processing_msg = await message.answer("⏳ Adding account... This may take a moment.")
+        processing_msg = await message.answer("⏳ Sending verification code... Please wait.")
         
         try:
-            success, result_message = await self.telethon.add_account_interactive(formatted_phone, api_id, api_hash)
+            success, result_message, verification_data = await self.telethon.start_account_verification(formatted_phone, api_id, api_hash)
+            
+            await processing_msg.delete()
+            
+            if success:
+                # Store verification data in state
+                await state.update_data(verification_data=verification_data)
+                
+                text = f"""
+✅ {result_message}
+
+📱 **Enter Verification Code**
+
+Please check your phone {formatted_phone} for a verification code from Telegram.
+
+Enter the verification code you received:
+
+📋 **Format**: 12345 (just the numbers)
+
+⚠️ **Important:**
+• Don't include spaces or dashes
+• Code expires in a few minutes
+• Check SMS or phone call
+
+Send the code or /cancel to abort.
+                """
+                
+                await message.answer(text, reply_markup=BotKeyboards.cancel_operation(), parse_mode="Markdown")
+                await state.set_state(AdminStates.waiting_for_verification_code)
+            else:
+                await message.answer(
+                    f"{result_message}\n\n❌ Failed to start verification. Please try again.",
+                    reply_markup=BotKeyboards.account_management()
+                )
+                await state.clear()
+        
+        except Exception as e:
+            await processing_msg.delete()
+            logger.error(f"Error starting verification: {e}")
+            await message.answer(
+                "❌ An error occurred while starting verification. Please try again.",
+                reply_markup=BotKeyboards.account_management()
+            )
+            await state.clear()
+    
+    async def process_verification_code(self, message: types.Message, state: FSMContext):
+        """Process verification code input"""
+        code = message.text.strip()
+        
+        if code == "/cancel":
+            # Clean up verification data
+            data = await state.get_data()
+            verification_data = data.get("verification_data")
+            if verification_data and verification_data.get('client'):
+                try:
+                    await verification_data['client'].disconnect()
+                except:
+                    pass
+            
+            await state.clear()
+            await message.answer("❌ Operation cancelled", reply_markup=BotKeyboards.account_management())
+            return
+        
+        # Validate code format
+        if not code.isdigit() or len(code) < 4:
+            await message.answer("❌ Invalid code format. Please enter only numbers (e.g., 12345) or /cancel")
+            return
+        
+        # Get verification data from state
+        data = await state.get_data()
+        verification_data = data.get("verification_data")
+        
+        if not verification_data:
+            await message.answer("❌ Verification session expired. Please start again.", reply_markup=BotKeyboards.account_management())
+            await state.clear()
+            return
+        
+        # Show processing message
+        processing_msg = await message.answer("⏳ Verifying code... Please wait.")
+        
+        try:
+            success, result_message = await self.telethon.complete_account_verification(verification_data, code)
             
             await processing_msg.delete()
             
             if success:
                 await message.answer(
-                    f"{result_message}\n\n✅ Account added successfully!",
+                    f"{result_message}\n\n🎉 Account successfully added and ready for use!",
                     reply_markup=BotKeyboards.account_management()
                 )
             else:
                 await message.answer(
-                    f"{result_message}\n\n❌ Failed to add account. Please try again.",
-                    reply_markup=BotKeyboards.account_management()
+                    f"{result_message}\n\nPlease try again or /cancel to abort.",
+                    reply_markup=BotKeyboards.cancel_operation()
                 )
+                return  # Don't clear state, allow retry
         
         except Exception as e:
             await processing_msg.delete()
-            logger.error(f"Error adding account: {e}")
+            logger.error(f"Error completing verification: {e}")
             await message.answer(
-                "❌ An error occurred while adding the account. Please try again.",
-                reply_markup=BotKeyboards.account_management()
+                "❌ An error occurred during verification. Please try again or /cancel",
+                reply_markup=BotKeyboards.cancel_operation()
             )
+            return  # Don't clear state, allow retry
         
         await state.clear()
     

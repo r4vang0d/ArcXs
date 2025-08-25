@@ -12,7 +12,7 @@ from pathlib import Path
 
 from telethon import TelegramClient, events
 from telethon.errors import (
-    FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError,
+    FloodWaitError, SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError,
     PhoneNumberInvalidError, ChannelPrivateError, ChatAdminRequiredError,
     UserBannedInChannelError, UserAlreadyParticipantError, PeerFloodError
 )
@@ -36,8 +36,14 @@ class TelethonManager:
     
     async def add_account_interactive(self, phone: str, api_id: int = None, api_hash: str = None) -> Tuple[bool, str]:
         """
-        Add a new account via interactive phone login
-        Returns (success, message)
+        DEPRECATED: Use start_account_verification instead
+        """
+        return False, "Use start_account_verification and complete_account_verification instead"
+    
+    async def start_account_verification(self, phone: str, api_id: int = None, api_hash: str = None) -> Tuple[bool, str, any]:
+        """
+        Start account verification process and request code
+        Returns (success, message, verification_data)
         """
         # Use provided credentials or fall back to defaults
         api_id = api_id or self.config.DEFAULT_API_ID
@@ -50,10 +56,44 @@ class TelethonManager:
             # Create Telethon client with provided/default credentials
             client = TelegramClient(session_path, api_id, api_hash)
             
-            # Start the client
-            await client.start(phone=phone)
+            # Connect and request verification code
+            await client.connect()
             
-            if await client.is_user_authorized():
+            # Send code request
+            sent_code = await client.send_code_request(phone)
+            
+            verification_data = {
+                'client': client,
+                'phone': phone,
+                'phone_code_hash': sent_code.phone_code_hash,
+                'session_name': session_name
+            }
+            
+            return True, "📱 Verification code sent to your phone!", verification_data
+            
+        except PhoneNumberInvalidError:
+            return False, "❌ Invalid phone number format", None
+        except FloodWaitError as e:
+            return False, f"❌ Flood wait error: try again in {e.seconds} seconds", None
+        except Exception as e:
+            logger.error(f"Error starting verification for {phone}: {e}")
+            return False, f"❌ Error: {str(e)}", None
+    
+    async def complete_account_verification(self, verification_data: dict, code: str) -> Tuple[bool, str]:
+        """
+        Complete account verification with the provided code
+        Returns (success, message)
+        """
+        try:
+            client = verification_data['client']
+            phone = verification_data['phone']
+            phone_code_hash = verification_data['phone_code_hash']
+            session_name = verification_data['session_name']
+            
+            # Sign in with the verification code
+            user = await client.sign_in(phone, code, phone_code_hash=phone_code_hash)
+            
+            if user and await client.is_user_authorized():
                 # Get user info
                 me = await client.get_me()
                 logger.info(f"Successfully logged in as {me.first_name} ({phone})")
@@ -69,7 +109,7 @@ class TelethonManager:
                         LogType.JOIN,
                         message=f"Account {phone} ({me.first_name}) added successfully"
                     )
-                    return True, f"✅ Account {phone} added successfully!"
+                    return True, f"✅ Account {phone} ({me.first_name}) added successfully!"
                 else:
                     await client.disconnect()
                     return False, "❌ Failed to save account to database"
@@ -77,14 +117,21 @@ class TelethonManager:
                 await client.disconnect()
                 return False, "❌ Failed to authorize account"
                 
-        except PhoneNumberInvalidError:
-            return False, "❌ Invalid phone number format"
-        except FloodWaitError as e:
-            return False, f"❌ Flood wait error: try again in {e.seconds} seconds"
+        except PhoneCodeInvalidError:
+            await verification_data['client'].disconnect()
+            return False, "❌ Invalid verification code. Please try again."
+        except PhoneCodeExpiredError:
+            await verification_data['client'].disconnect()
+            return False, "❌ Verification code expired. Please start the process again."
         except SessionPasswordNeededError:
-            return False, "❌ Two-factor authentication detected. Please disable 2FA temporarily"
+            await verification_data['client'].disconnect()
+            return False, "❌ Two-factor authentication detected. Please disable 2FA temporarily."
+        except FloodWaitError as e:
+            await verification_data['client'].disconnect()
+            return False, f"❌ Flood wait error: try again in {e.seconds} seconds"
         except Exception as e:
-            logger.error(f"Error adding account {phone}: {e}")
+            logger.error(f"Error completing verification for {phone}: {e}")
+            await verification_data['client'].disconnect()
             return False, f"❌ Error: {str(e)}"
     
     async def remove_account(self, phone: str) -> Tuple[bool, str]:
