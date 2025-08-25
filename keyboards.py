@@ -73,7 +73,7 @@ class BotKeyboards:
              InlineKeyboardButton(text="📋 List Accounts", callback_data="list_accounts")],
             [InlineKeyboardButton(text="🗑️ Remove Account", callback_data="remove_account"),
              InlineKeyboardButton(text="🔄 Refresh Status", callback_data="refresh_accounts")],
-            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
@@ -94,7 +94,7 @@ class BotKeyboards:
              InlineKeyboardButton(text="❌ Blacklist Channel", callback_data="channel_blacklist")],
             [InlineKeyboardButton(text="📋 View Lists", callback_data="channel_lists"),
              InlineKeyboardButton(text="🗑️ Remove Entry", callback_data="channel_remove")],
-            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
@@ -200,7 +200,7 @@ class BotKeyboards:
         
         buttons.append([
             InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_accounts"),
-            InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")
+            InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
         ])
         
         return InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -229,6 +229,6 @@ class BotKeyboards:
              InlineKeyboardButton(text="⚠️ Errors", callback_data="logs_error")],
             [InlineKeyboardButton(text="🚫 Bans", callback_data="logs_ban"),
              InlineKeyboardButton(text="⏳ Flood Waits", callback_data="logs_flood_wait")],
-            [InlineKeyboardButton(text="🔙 Admin Panel", callback_data="admin_panel")],
+            [InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")],
         ]
         return InlineKeyboardMarkup(inline_keyboard=buttons)

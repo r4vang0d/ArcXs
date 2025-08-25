@@ -47,9 +47,8 @@ class AdminHandler:
         
         data = callback_query.data
         
-        if data == "admin_panel":
-            await self.show_admin_panel(callback_query)
-        elif data == "admin_accounts":
+        # Admin panel removed for personal use - redirects to main menu
+        if data == "admin_accounts":
             await self.show_account_management(callback_query)
         elif data == "admin_logs":
             await self.show_logs_menu(callback_query)
@@ -115,32 +114,7 @@ class AdminHandler:
         elif current_state == AdminStates.waiting_for_remove_channel.state:
             await self.process_remove_channel(message, state)
     
-    async def show_admin_panel(self, callback_query: types.CallbackQuery):
-        """Show main admin panel"""
-        # Get system statistics
-        account_health = await self.telethon.check_account_health()
-        user_count = await self.db.get_user_count()
-        
-        admin_text = f"""
-🔧 **Admin Panel**
-
-📊 **System Overview:**
-👥 Users: {user_count}
-📱 Active Accounts: {account_health.get('active', 0)}
-🚫 Banned Accounts: {account_health.get('banned', 0)}
-⏳ Flood Wait: {account_health.get('flood_wait', 0)}
-❌ Inactive: {account_health.get('inactive', 0)}
-
-Choose an action below:
-        """
-        
-        if callback_query.message:
-            await callback_query.message.edit_text(
-                admin_text,
-                reply_markup=BotKeyboards.admin_panel(),
-                parse_mode="Markdown"
-            )
-        await callback_query.answer()
+    # Old admin panel function removed for personal use
     
     async def show_account_management(self, callback_query: types.CallbackQuery):
         """Show account management options"""
