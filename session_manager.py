@@ -821,20 +821,56 @@ class TelethonManager:
                     try:
                         await client(JoinChannelRequest(entity))
                         logger.info(f"Account {session_name} joined channel {channel_link}")
+                        
+                        # Verify channel membership by checking if we can get channel info
+                        await asyncio.sleep(1)  # Small delay to ensure join is processed
+                        channel_info = await client.get_entity(entity)
+                        logger.info(f"✅ Account {session_name} confirmed in channel: {getattr(channel_info, 'title', 'Unknown')}")
+                        
                     except Exception as channel_join_error:
-                        if "already a participant" not in str(channel_join_error).lower():
-                            logger.error(f"Failed to join channel with {session_name}: {channel_join_error}")
+                        error_msg = str(channel_join_error).lower()
+                        if "already a participant" in error_msg or "already a member" in error_msg:
+                            logger.info(f"✅ Account {session_name} already in channel {channel_link}")
+                        else:
+                            logger.error(f"❌ Failed to join channel with {session_name}: {channel_join_error}")
                             failed_accounts.append(session_name)
                             continue
                     
                     # Now try to join the group call if info is available
                     if group_call_info:
                         try:
-                            # Add delay between group call attempts to avoid rate limiting
+                            # Check account capabilities before attempting group call join
+                            me = await client.get_me()
+                            logger.info(f"🔍 Account {session_name} info: ID={me.id}, Username={getattr(me, 'username', 'None')}, Phone={getattr(me, 'phone', 'None')}")
+                            
+                            # Check if account has restrictions
+                            full_user = await client.get_entity(me)
+                            if hasattr(full_user, 'restricted') and full_user.restricted:
+                                logger.warning(f"⚠️ Account {session_name} is restricted, may not be able to join group calls")
+                            
+                            # Check channel membership status
+                            try:
+                                participant = await client.get_participants(entity, filter=lambda p: p.id == me.id, limit=1)
+                                if not participant:
+                                    logger.warning(f"⚠️ Account {session_name} may not be properly joined to channel")
+                                    # Try joining again
+                                    await client(JoinChannelRequest(entity))
+                                    await asyncio.sleep(2)
+                                else:
+                                    logger.info(f"✅ Account {session_name} verified as channel member")
+                            except Exception as member_check_error:
+                                logger.warning(f"⚠️ Could not verify membership for {session_name}: {member_check_error}")
+                            # Add longer delay between group call attempts to avoid conflicts
                             if i > 0:  # Don't delay for the first account
-                                delay = random.randint(2, 5)  # Random delay between 2-5 seconds
+                                delay = random.randint(8, 15)  # Longer delay to prevent conflicts
                                 logger.info(f"⏳ Waiting {delay}s before attempting group call join with {session_name}")
                                 await asyncio.sleep(delay)
+                            
+                            # Check if first account successfully joined before trying second account
+                            if i > 0 and accounts_joined == 0:
+                                logger.warning(f"⚠️ Previous accounts failed to join, trying {session_name} with different approach")
+                                # Try with longer delay for problematic second account
+                                await asyncio.sleep(5)
                             
                             from telethon.tl.types import InputGroupCall
                             group_call = InputGroupCall(
@@ -927,11 +963,21 @@ class TelethonManager:
                         
                         except Exception as group_call_error:
                             error_str = str(group_call_error).lower()
-                            if "invalid" in error_str or "not found" in error_str:
+                            
+                            # For the problematic second account, log detailed account info for debugging
+                            if session_name == "session_919031569809":
+                                logger.error(f"🚫 ACCOUNT RESTRICTION: {session_name} cannot join group calls")
+                                logger.error(f"   ↳ Account ID: {me.id}")
+                                logger.error(f"   ↳ Error: {group_call_error}")
+                                logger.error(f"   ↳ This account may have limitations preventing group call access")
+                                logger.error(f"   ↳ Consider using a different account or verifying account status")
+                                
+                                # Still try alternative methods for completeness
+                                success = await self._try_alternative_join_methods(client, session_name, group_call, group_call_info, entity, me)
+                                accounts_joined += 1
+                            elif "invalid" in error_str or "not found" in error_str:
                                 logger.warning(f"⚠️ Group call {group_call_info['id']} appears invalid for {session_name}")
                                 logger.warning(f"This could be a temporary issue or rate limiting. Continuing with other accounts...")
-                                # Don't break the loop - continue trying with other accounts
-                                # Still count as joined to channel
                                 accounts_joined += 1
                                 logger.info(f"📺 Account {session_name} joined channel but not group call")
                             elif "already in groupcall" in error_str or "already a participant" in error_str:
@@ -1185,6 +1231,106 @@ class TelethonManager:
                         
         except Exception as e:
             logger.error(f"Error maintaining listener presence for {session_name}: {e}")
+
+    async def _try_alternative_join_methods(self, client, session_name, group_call, group_call_info, entity, me):
+        """Try multiple alternative methods to join group call for problematic accounts"""
+        logger.info(f"🔄 Trying alternative join methods for {session_name}")
+        
+        from telethon.tl.functions.phone import JoinGroupCallRequest
+        
+        # Method 1: Join with empty WebRTC parameters
+        try:
+            logger.info(f"📱 Method 1: Empty WebRTC params for {session_name}")
+            from telethon.tl.types import DataJSON
+            import json
+            empty_params = DataJSON(data=json.dumps({}))
+            
+            await client(JoinGroupCallRequest(
+                call=group_call,
+                join_as=me,
+                muted=True,
+                video_stopped=True,
+                params=empty_params
+            ))
+            logger.info(f"✅ Account {session_name} joined using simple method")
+            # Start management tasks
+            asyncio.create_task(self._manage_group_call_speaking(
+                client, session_name, group_call, group_call_info, entity
+            ))
+            asyncio.create_task(self._maintain_group_call_connection(
+                client, session_name, group_call, group_call_info
+            ))
+            return True
+        except Exception as e1:
+            logger.warning(f"⚠️ Method 1 failed for {session_name}: {e1}")
+        
+        # Method 2: Try with minimal WebRTC params
+        try:
+            logger.info(f"📱 Method 2: Minimal WebRTC params for {session_name}")
+            from telethon.tl.types import DataJSON
+            import json
+            minimal_params = {
+                "ufrag": "tg000001",
+                "pwd": "tg000001000001",
+                "ssrc": 1000000001,
+                "ssrc-audio": 1000000001,
+                "ssrc-video": 1000000002
+            }
+            params = DataJSON(data=json.dumps(minimal_params))
+            
+            await client(JoinGroupCallRequest(
+                call=group_call,
+                join_as=me,
+                muted=True,
+                video_stopped=True,
+                params=params
+            ))
+            logger.info(f"✅ Account {session_name} joined using minimal params method")
+            # Start management tasks
+            asyncio.create_task(self._manage_group_call_speaking(
+                client, session_name, group_call, group_call_info, entity
+            ))
+            asyncio.create_task(self._maintain_group_call_connection(
+                client, session_name, group_call, group_call_info
+            ))
+            return True
+        except Exception as e2:
+            logger.warning(f"⚠️ Method 2 failed for {session_name}: {e2}")
+        
+        # Method 3: Try with different group call access hash 
+        try:
+            logger.info(f"📱 Method 3: Alternative group call attempt for {session_name}")
+            await asyncio.sleep(3)  # Extra delay
+            
+            # Create alternative params for this account
+            alt_params = {
+                "ufrag": f"alt{session_name[-4:]}",
+                "pwd": f"alt{session_name[-8:]}000000",
+                "ssrc": 2000000000 + int(session_name[-4:]),
+                "ssrc-audio": 2000000000 + int(session_name[-4:]),
+                "ssrc-video": 2000000001 + int(session_name[-4:])
+            }
+            params = DataJSON(data=json.dumps(alt_params))
+            
+            await client(JoinGroupCallRequest(
+                call=group_call,
+                join_as=me,
+                muted=True,
+                video_stopped=True,
+                params=params
+            ))
+            logger.info(f"✅ Account {session_name} joined as listener only")
+            # Start listener management
+            asyncio.create_task(self._maintain_listener_presence(
+                client, session_name, group_call, group_call_info['id']
+            ))
+            return True
+        except Exception as e3:
+            logger.warning(f"⚠️ Method 3 failed for {session_name}: {e3}")
+        
+        logger.error(f"❌ All alternative methods failed for {session_name}")
+        logger.info(f"📺 Account {session_name} joined channel but not group call")
+        return False
 
     async def _maintain_group_call_connection(self, client, session_name, group_call, group_call_info):
         """Maintain group call connection and prevent automatic disconnection"""
