@@ -2584,24 +2584,41 @@ Select how quickly you want the views to be delivered.
             else:
                 final_text = f"❌ **Reactions Failed**\n\n{reaction_message}"
             
-            if hasattr(processing_msg, 'edit_text'):
-                await processing_msg.edit_text(
-                    final_text,
-                    reply_markup=BotKeyboards.main_menu(True),
-                    parse_mode="Markdown"
-                )
-            else:
-                try:
-                    if hasattr(processing_msg, 'delete'):
-                        await processing_msg.delete()
-                except Exception:
-                    pass  # Ignore deletion errors
-                if hasattr(message_obj, 'answer'):
-                    await message_obj.answer(
+            try:
+                if hasattr(processing_msg, 'edit_text'):
+                    await processing_msg.edit_text(
                         final_text,
                         reply_markup=BotKeyboards.main_menu(True),
                         parse_mode="Markdown"
                     )
+                else:
+                    # Fallback: send new message
+                    if hasattr(message_obj, 'message') and hasattr(message_obj.message, 'answer'):
+                        # It's a callback query - use message.answer()
+                        await message_obj.message.answer(
+                            final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+                    elif hasattr(message_obj, 'answer'):
+                        # It's a regular message
+                        await message_obj.answer(
+                            final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+            except Exception as msg_error:
+                logger.error(f"Error sending final reactions message: {msg_error}")
+                # Final fallback - try to send via callback query message
+                try:
+                    if hasattr(message_obj, 'message'):
+                        await message_obj.message.answer(
+                            final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+                except Exception:
+                    logger.error("Failed to send completion message via any method")
             
             await state.clear()
             
