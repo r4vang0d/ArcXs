@@ -6,6 +6,11 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 
 # Recent Changes
 
+## August 26, 2025 - Multi-Account Join Fix
+- **Live Management Multi-Account Fix**: Fixed issue where only one account was joining live streams during monitoring by removing temporary debugging code that limited to single account
+- **All Accounts Joining**: Both accounts now properly join live streams when detected during live management monitoring
+- **Account Selection Logic**: Restored proper account selection logic that respects user preferences (specific count vs all accounts)
+
 ## August 26, 2025 - Final Resolution
 - **Permanent Group Call Presence**: Fixed accounts automatically leaving after mute/unmute behavior ends by implementing continuous presence system
 - **Fresh Join Attempts**: Added retry logic and cache management to allow fresh attempts when monitoring restarts

@@ -803,17 +803,13 @@ class TelethonManager:
         accounts_joined = 0
         failed_accounts = []
         
-        # TEMPORARY: Test with only second account to debug the issue
-        accounts_to_use = ["session_919031569809"] if "session_919031569809" in self.active_clients else self.active_clients
-        logger.info(f"🧪 TESTING: Using only second account for debugging: {accounts_to_use}")
-        
         # Determine which accounts to use
-        # accounts_to_use = self.active_clients
-        # if max_accounts and max_accounts > 0:
-        #     accounts_to_use = self.active_clients[:max_accounts]
-        #     logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
-        # else:
-        #     logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
+        accounts_to_use = self.active_clients
+        if max_accounts and max_accounts > 0:
+            accounts_to_use = self.active_clients[:max_accounts]
+            logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
+        else:
+            logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
         
         try:
             for i, session_name in enumerate(accounts_to_use):
