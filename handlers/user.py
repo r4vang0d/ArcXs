@@ -1340,7 +1340,7 @@ Select a channel below to start:
     async def handle_auto_count_setting(self, callback_query: types.CallbackQuery, data: str):
         """Handle auto message count setting changes"""
         user_id = callback_query.from_user.id
-        logger.info(f"🔧 DEBUG: Auto count setting called with data: {data} for user: {user_id}")
+
         
         count_map = {
             "auto_count_1": 1,
@@ -1538,31 +1538,18 @@ Last Boosted: {last_boosted}
         try:
             user = await self.db.get_user(user_id)
             if not user:
-                logger.error(f"💾 DEBUG: User {user_id} not found in database")
                 return False
             
-            logger.info(f"💾 DEBUG: Current user data: {user}")
             settings = Utils.parse_user_settings(user.get("settings", "{}"))
-            logger.info(f"💾 DEBUG: Current settings before update: {settings}")
-            
             settings[setting_name] = value
-            logger.info(f"💾 DEBUG: Settings after update: {settings}")
-            
             serialized_settings = Utils.serialize_user_settings(settings)
-            logger.info(f"💾 DEBUG: Serialized settings: {serialized_settings}")
             
             # Update in database
-            logger.info(f"💾 DEBUG: Executing UPDATE for user {user_id}")
             await self.db._execute_with_lock(
                 "UPDATE users SET settings = ? WHERE id = ?",
                 (serialized_settings, user_id)
             )
             await self.db._commit_with_lock()
-            logger.info(f"💾 DEBUG: Database update completed for user {user_id}")
-            
-            # Verify update worked
-            updated_user = await self.db.get_user(user_id)
-            logger.info(f"💾 DEBUG: Verification - updated user data: {updated_user}")
             
             return True
                 

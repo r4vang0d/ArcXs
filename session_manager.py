@@ -558,18 +558,43 @@ class TelethonManager:
         """Get recent message IDs from a channel"""
         client_data = await self.get_next_available_client()
         if not client_data:
+            logger.warning("No available clients for channel message fetching")
             return []
         
-        client, _ = client_data
+        client, account = client_data
         
         try:
+            # Normalize channel link
+            if not channel_link.startswith('https://'):
+                if channel_link.startswith('@'):
+                    channel_link = channel_link[1:]  # Remove @ prefix
+                elif not channel_link.startswith('t.me/'):
+                    channel_link = f"https://t.me/{channel_link}"
+            
+            # Get entity with better error handling
             entity = await client.get_entity(channel_link)
+            
+            # Verify we have access to the channel
+            if hasattr(entity, 'title'):
+                logger.info(f"Successfully accessing channel: {entity.title}")
+            else:
+                logger.info(f"Accessing channel: {channel_link}")
+                
             messages = await client.get_messages(entity, limit=limit)
             if messages:
-                return [msg.id for msg in messages if hasattr(msg, 'id') and msg.id]
+                message_ids = [msg.id for msg in messages if hasattr(msg, 'id') and msg.id]
+                logger.info(f"Retrieved {len(message_ids)} message IDs from channel")
+                return message_ids
             return []
+            
         except Exception as e:
-            logger.error(f"Error getting messages from {channel_link}: {e}")
+            error_msg = str(e).lower()
+            if "could not find the input entity" in error_msg or "no user has" in error_msg:
+                logger.error(f"Channel not found or inaccessible: {channel_link} - {e}")
+            elif "flood" in error_msg:
+                logger.warning(f"Rate limited while fetching from {channel_link}: {e}")
+            else:
+                logger.error(f"Error getting messages from {channel_link}: {e}")
             return []
     
     async def check_account_health(self) -> Dict[str, int]:
