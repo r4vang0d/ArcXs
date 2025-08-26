@@ -3,8 +3,9 @@ Advanced rate limiter for Telegram operations
 Prevents flood errors and manages API call limits
 """
 import asyncio
+import random
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 from collections import defaultdict, deque
 import logging
 
@@ -88,7 +89,7 @@ class RateLimiter:
             self.global_calls.append(current_time)
             return True
     
-    async def execute_with_rate_limit(self, coro, account_id: str = None):
+    async def execute_with_rate_limit(self, coro, account_id: Optional[str] = None):
         """Execute coroutine with rate limiting"""
         try:
             # Wait for global rate limit
@@ -100,7 +101,6 @@ class RateLimiter:
                     raise Exception(f"Account {account_id} is in flood wait")
             
             # Add small delay between calls
-            import random
             delay = random.uniform(self.MIN_DELAY, self.MAX_DELAY)
             await asyncio.sleep(delay)
             

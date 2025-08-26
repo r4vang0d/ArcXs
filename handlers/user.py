@@ -2409,7 +2409,11 @@ Select how quickly you want the views to be delivered.
                     parse_mode="Markdown"
                 )
             else:
-                await processing_msg.delete()
+                try:
+                    if hasattr(processing_msg, 'delete'):
+                        await processing_msg.delete()
+                except Exception:
+                    pass  # Ignore deletion errors
                 if hasattr(message_obj, 'answer'):
                     await message_obj.answer(
                         final_text,
@@ -2538,7 +2542,11 @@ Select how quickly you want the views to be delivered.
                     parse_mode="Markdown"
                 )
             else:
-                await processing_msg.delete()
+                try:
+                    if hasattr(processing_msg, 'delete'):
+                        await processing_msg.delete()
+                except Exception:
+                    pass  # Ignore deletion errors
                 if hasattr(message_obj, 'answer'):
                     await message_obj.answer(
                         final_text,
