@@ -724,9 +724,7 @@ Select your preferred mode:
             channel_link = state_data.get(channel_link_key)
             channel_id = state_data.get(channel_id_key)
             
-            # Debug logging to check state data
-            logger.info(f"🔍 DEBUG: State data keys: {list(state_data.keys())}")
-            logger.info(f"🔍 DEBUG: Feature type: {feature_type}, Channel link: {channel_link}, Channel ID: {channel_id}")
+            logger.info(f"Processing {feature_type} auto option with state keys: {len(state_data.keys())} items")
             
             # Check if we have the required channel information
             if not channel_link or not channel_id:
@@ -759,7 +757,7 @@ Select your preferred mode:
                 user_id = callback_query.from_user.id
                 auto_count = await self.get_user_setting(user_id, "auto_message_count")
                 if not auto_count or auto_count <= 0:
-                    auto_count = 10  # Default fallback
+                    auto_count = 2  # Default fallback - safer for testing
                     # Save the default setting for the user
                     await self.set_user_setting(user_id, "auto_message_count", auto_count)
                 
@@ -773,12 +771,13 @@ Select your preferred mode:
                 await callback_query.answer()
                 
                 # Proceed with boost or reactions based on feature type
+                # Important: Don't clear state here - let the execution functions handle it
                 if feature_type == "reactions":
                     await self.execute_reactions_with_settings(callback_query, state, message_ids, view_count, time_minutes)
                 else:
                     await self.execute_boost_with_settings(callback_query, state, message_ids, view_count, time_minutes)
                 
-                # Ensure we return here to prevent further execution
+                # Return without additional state clearing - functions handle their own state
                 return
                 
             else:
@@ -1528,14 +1527,10 @@ Last Boosted: {last_boosted}
         """Get user setting value"""
         user = await self.db.get_user(user_id)
         if not user:
-            logger.info(f"🔍 DEBUG: No user found for ID: {user_id}")
             return None
         
         settings = Utils.parse_user_settings(user.get("settings", "{}"))
         setting_value = settings.get(setting_name)
-        logger.info(f"🔍 DEBUG: Retrieved {setting_name} = {setting_value} for user {user_id}")
-        if setting_name == "auto_message_count":
-            logger.info(f"🔍 DEBUG: Full settings for user {user_id}: {settings}")
         return setting_value
     
     async def update_user_setting(self, user_id: int, setting_name: str, value: any) -> bool:

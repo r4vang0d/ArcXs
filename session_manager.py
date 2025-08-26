@@ -435,10 +435,10 @@ class TelethonManager:
         if not self.active_clients:
             return False, "❌ No active accounts available", 0
         
-        # Simple emoji reactions for Telegram (no complex modifiers)
+        # Telegram-approved emoji reactions (compatible with ReactionEmoji)
         available_emojis = [
-            "❤", "👍", "👎", "😂", "😮", "😢", "😡", "👏", "🔥", "💯", 
-            "🎉", "⚡", "💝", "😍", "🤩", "😎", "🤔", "🙄", "😬", "🤯",
+            "❤️", "👍", "👎", "😂", "😮", "😢", "😡", "👏", "🔥", "💯", 
+            "🎉", "⚡️", "💝", "😍", "🤩", "😎", "🤔", "🙄", "😬", "🤯",
             "😊", "😘", "🥰", "😜", "🤗", "🤭", "🙂", "🥳", "😇", "🤠"
         ]
         
@@ -522,7 +522,23 @@ class TelethonManager:
                 continue
                 
             except Exception as e:
-                logger.error(f"Error reacting to message {message_id} with {account.get('username', account['phone'])}: {e}")
+                error_msg = str(e)
+                if "Invalid reaction provided" in error_msg:
+                    logger.warning(f"Invalid emoji reaction for message {message_id} with {account.get('username', account['phone'])}, trying alternative emoji")
+                    # Try with a simple thumbs up as fallback
+                    try:
+                        await client(SendReactionRequest(
+                            peer=entity,
+                            msg_id=message_id,
+                            reaction=[ReactionEmoji(emoticon="👍")]
+                        ))
+                        total_reactions += 1
+                        successful_accounts += 1
+                        logger.info(f"✅ Fallback reaction successful for message {message_id}")
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback reaction also failed: {fallback_error}")
+                else:
+                    logger.error(f"Error reacting to message {message_id} with {account.get('username', account['phone'])}: {e}")
                 await self.db.increment_failed_attempts(account["id"])
                 await self.db.log_action(
                     LogType.ERROR,
