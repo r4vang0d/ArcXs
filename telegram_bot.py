@@ -252,11 +252,23 @@ class ViewBoosterBot:
             if self.config.is_admin(user_id):
                 await self.user_handler.handle_callback(callback_query, state)
             else:
-                await callback_query.answer("🚫 ARCX - Access Restricted. Authorized users only.", show_alert=True)
+                await self.safe_callback_answer(callback_query, "🚫 ARCX - Access Restricted. Authorized users only.", show_alert=True)
             
         except Exception as e:
             logger.error(f"Error handling callback {data}: {e}")
-            await callback_query.answer("❌ An error occurred. Please try again.", show_alert=True)
+            # Use safe callback answer to prevent timeout errors
+            await self.safe_callback_answer(callback_query, "❌ An error occurred. Please try again.", show_alert=True)
+    
+    async def safe_callback_answer(self, callback_query: types.CallbackQuery, text: str = None, show_alert: bool = False):
+        """Safely answer callback query, ignoring timeout/expired query errors"""
+        try:
+            await callback_query.answer(text, show_alert=show_alert)
+        except Exception as e:
+            # Common errors: query too old, already answered, invalid query ID
+            if "too old" in str(e) or "expired" in str(e) or "invalid" in str(e):
+                logger.debug(f"Callback query expired/invalid, ignoring: {e}")
+            else:
+                logger.warning(f"Unexpected callback answer error: {e}")
     
     async def handle_text_message(self, message: types.Message, state: FSMContext):
         """Handle all text input routing to appropriate handlers"""
