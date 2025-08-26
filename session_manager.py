@@ -860,17 +860,21 @@ class TelethonManager:
                                     logger.info(f"✅ Account {session_name} verified as channel member")
                             except Exception as member_check_error:
                                 logger.warning(f"⚠️ Could not verify membership for {session_name}: {member_check_error}")
-                            # Add longer delay between group call attempts to avoid conflicts
+                            # Get fresh group call info for each account to avoid "invalid" errors
+                            if i > 0:  # Don't check for the first account
+                                logger.info(f"🔄 Getting fresh group call info for account {session_name}")
+                                fresh_has_live, fresh_group_call_info = await self.check_channel_for_live_stream(channel_link)
+                                if fresh_has_live and fresh_group_call_info:
+                                    group_call_info = fresh_group_call_info
+                                    logger.info(f"✅ Updated group call info: {group_call_info}")
+                                else:
+                                    logger.warning(f"⚠️ Could not get fresh group call info for {session_name}")
+                            
+                            # Add delay between group call attempts but reduce it for efficiency
                             if i > 0:  # Don't delay for the first account
-                                delay = random.randint(8, 15)  # Longer delay to prevent conflicts
+                                delay = random.randint(2, 5)  # Shorter delay but still avoid conflicts
                                 logger.info(f"⏳ Waiting {delay}s before attempting group call join with {session_name}")
                                 await asyncio.sleep(delay)
-                            
-                            # Check if first account successfully joined before trying second account
-                            if i > 0 and accounts_joined == 0:
-                                logger.warning(f"⚠️ Previous accounts failed to join, trying {session_name} with different approach")
-                                # Try with longer delay for problematic second account
-                                await asyncio.sleep(5)
                             
                             from telethon.tl.types import InputGroupCall
                             group_call = InputGroupCall(
@@ -1003,8 +1007,8 @@ class TelethonManager:
                                 except Exception as check_error:
                                     logger.error(f"   ↳ Could not check account restrictions: {check_error}")
                                 
-                                # Still try alternative methods for completeness
-                                success = await self._try_alternative_join_methods(client, session_name, group_call, group_call_info, entity, me)
+                                # Try alternative methods with multiple retries for this problematic account
+                                success = await self._try_alternative_join_methods_with_retries(client, session_name, group_call, group_call_info, entity, me, channel_link)
                                 accounts_joined += 1
                             elif "invalid" in error_str or "not found" in error_str:
                                 logger.warning(f"⚠️ Group call {group_call_info['id']} appears invalid for {session_name}")
@@ -1262,6 +1266,43 @@ class TelethonManager:
                         
         except Exception as e:
             logger.error(f"Error maintaining listener presence for {session_name}: {e}")
+
+    async def _try_alternative_join_methods_with_retries(self, client, session_name, group_call, group_call_info, entity, me, channel_link):
+        """Try alternative join methods with multiple retries and fresh group call info"""
+        logger.info(f"🔄 Trying alternative join methods with retries for {session_name}")
+        
+        max_retries = 5
+        for retry in range(max_retries):
+            if retry > 0:
+                retry_delay = random.randint(10, 20)
+                logger.info(f"🔄 Retry {retry}/{max_retries} for {session_name} in {retry_delay}s")
+                await asyncio.sleep(retry_delay)
+                
+                # Get completely fresh group call info for each retry
+                logger.info(f"🔄 Getting fresh group call info for retry {retry}")
+                fresh_has_live, fresh_group_call_info = await self.check_channel_for_live_stream(channel_link)
+                if fresh_has_live and fresh_group_call_info:
+                    group_call_info = fresh_group_call_info
+                    from telethon.tl.types import InputGroupCall
+                    group_call = InputGroupCall(
+                        id=group_call_info['id'],
+                        access_hash=group_call_info['access_hash']
+                    )
+                    logger.info(f"✅ Updated group call info for retry: {group_call_info}")
+                else:
+                    logger.warning(f"⚠️ No live stream found during retry {retry} for {session_name}")
+                    continue
+            
+            # Try alternative methods
+            success = await self._try_alternative_join_methods(client, session_name, group_call, group_call_info, entity, me)
+            if success:
+                logger.info(f"✅ Account {session_name} successfully joined after retry {retry}")
+                return True
+            else:
+                logger.warning(f"❌ Alternative methods failed for {session_name} on retry {retry}")
+        
+        logger.error(f"❌ All retries exhausted for {session_name}")
+        return False
 
     async def _try_alternative_join_methods(self, client, session_name, group_call, group_call_info, entity, me):
         """Try multiple alternative methods to join group call for problematic accounts"""
