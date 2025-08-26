@@ -405,7 +405,7 @@ Please send the phone number for the new account.
 ⚠️ **Requirements:**
 • Phone number has Telegram registered
 • Access to SMS/calls for verification
-• Two-factor authentication disabled
+• 2FA password ready (if enabled)
 
 Send the phone number or /cancel to abort.
         """
@@ -530,7 +530,7 @@ Please send the phone number for the new account.
 ⚠️ **Requirements:**
 • Phone number has Telegram registered
 • Access to SMS/calls for verification
-• Two-factor authentication disabled
+• 2FA password ready (if enabled)
 
 Send the phone number or /cancel to abort.
         """

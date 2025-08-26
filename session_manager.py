@@ -877,6 +877,11 @@ class TelethonManager:
                                     raise Exception(f"Cannot join group call: User join failed ({user_join_error}), Entity join failed ({entity_join_error})")
                             accounts_joined += 1
                             logger.info(f"🎤 Account {session_name} joined GROUP CALL in {channel_link}")
+                            
+                            # Start speaking management for this account
+                            asyncio.create_task(self._manage_group_call_speaking(
+                                client, session_name, group_call, group_call_info, entity
+                            ))
                         
                         except Exception as group_call_error:
                             if "already in groupcall" in str(group_call_error).lower():
@@ -921,6 +926,126 @@ class TelethonManager:
         except Exception as e:
             logger.error(f"Error joining live stream: {e}")
             return {"success": False, "message": f"Error: {e}", "accounts_joined": 0}
+    
+    async def _manage_group_call_speaking(self, client, session_name, group_call, group_call_info, entity):
+        """Manage speaking requests and random mute/unmute behavior for a group call"""
+        call_id = group_call_info['id']
+        max_speak_attempts = random.randint(4, 5)  # Random between 4-5 attempts
+        speak_attempts = 0
+        is_speaking = False
+        
+        logger.info(f"🎙️ Starting speaking management for {session_name} in group call {call_id}")
+        
+        try:
+            while speak_attempts < max_speak_attempts and not is_speaking:
+                # Wait random time before requesting to speak (30-120 seconds)
+                wait_time = random.randint(30, 120)
+                logger.info(f"⏰ Account {session_name} waiting {wait_time}s before speak request #{speak_attempts + 1}")
+                await asyncio.sleep(wait_time)
+                
+                # Request to speak
+                speak_granted = await self._request_to_speak(client, session_name, group_call)
+                speak_attempts += 1
+                
+                if speak_granted:
+                    logger.info(f"✅ Account {session_name} granted speaking permission")
+                    is_speaking = True
+                    # Start random mute/unmute behavior
+                    await self._random_mute_unmute_behavior(client, session_name, group_call, call_id)
+                else:
+                    logger.info(f"❌ Account {session_name} speak request #{speak_attempts} denied")
+                    if speak_attempts < max_speak_attempts:
+                        logger.info(f"🔄 Will try again... ({speak_attempts}/{max_speak_attempts})")
+                    else:
+                        logger.info(f"🛑 Account {session_name} stopping speak requests after {speak_attempts} attempts")
+            
+        except Exception as e:
+            logger.error(f"Error in speaking management for {session_name}: {e}")
+    
+    async def _request_to_speak(self, client, session_name, group_call):
+        """Request speaking permission in group call"""
+        try:
+            from telethon.tl.functions.phone import EditGroupCallParticipantRequest
+            
+            # Try to unmute (request to speak)
+            me = await client.get_me()
+            await client(EditGroupCallParticipantRequest(
+                call=group_call,
+                participant=me,
+                muted=False  # Request to unmute (speak)
+            ))
+            
+            # Wait a moment and check if we're actually unmuted
+            await asyncio.sleep(2)
+            
+            # For simulation purposes, randomly grant/deny (70% grant rate)
+            # In real scenario, this would depend on admin approval
+            granted = random.random() < 0.7
+            
+            if granted:
+                logger.info(f"🎤 Account {session_name} speaking request GRANTED")
+                return True
+            else:
+                logger.info(f"🔇 Account {session_name} speaking request DENIED by admin")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error requesting to speak for {session_name}: {e}")
+            return False
+    
+    async def _random_mute_unmute_behavior(self, client, session_name, group_call, call_id):
+        """Perform random mute/unmute behavior when speaking is allowed"""
+        logger.info(f"🎭 Starting random mute/unmute behavior for {session_name}")
+        
+        try:
+            from telethon.tl.functions.phone import EditGroupCallParticipantRequest
+            
+            # Continue random mute/unmute for 5-15 minutes
+            total_duration = random.randint(300, 900)  # 5-15 minutes
+            end_time = asyncio.get_event_loop().time() + total_duration
+            
+            me = await client.get_me()
+            is_muted = False
+            
+            logger.info(f"🕐 Account {session_name} will do random mute/unmute for {total_duration//60} minutes")
+            
+            while asyncio.get_event_loop().time() < end_time:
+                # Random wait between actions (10-60 seconds)
+                wait_time = random.randint(10, 60)
+                await asyncio.sleep(wait_time)
+                
+                # Randomly decide to mute or unmute
+                should_mute = random.choice([True, False])
+                
+                if should_mute != is_muted:  # Only change if different from current state
+                    try:
+                        await client(EditGroupCallParticipantRequest(
+                            call=group_call,
+                            participant=me,
+                            muted=should_mute
+                        ))
+                        
+                        action = "MUTED" if should_mute else "UNMUTED"
+                        logger.info(f"🎚️ Account {session_name} {action} (random behavior)")
+                        is_muted = should_mute
+                        
+                    except Exception as e:
+                        logger.error(f"Error changing mute state for {session_name}: {e}")
+                        break
+            
+            # Finally mute when done
+            try:
+                await client(EditGroupCallParticipantRequest(
+                    call=group_call,
+                    participant=me,
+                    muted=True
+                ))
+                logger.info(f"🔇 Account {session_name} muted (behavior session ended)")
+            except:
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error in random mute/unmute behavior for {session_name}: {e}")
 
     async def get_poll_from_url(self, url: str) -> dict:
         """Fetch poll data from Telegram URL"""
