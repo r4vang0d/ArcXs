@@ -284,3 +284,107 @@ class BotKeyboards:
         ])
         
         return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def view_count_selection(available_accounts: int, feature_type: str = "boost") -> InlineKeyboardMarkup:
+        """Generate keyboard for selecting number of views based on available accounts"""
+        buttons = []
+        
+        # Provide options based on available accounts
+        if available_accounts >= 100:
+            buttons.append([
+                InlineKeyboardButton(text="💯 100 Views", callback_data=f"view_count:{feature_type}:100"),
+                InlineKeyboardButton(text="🔥 250 Views", callback_data=f"view_count:{feature_type}:250")
+            ])
+        
+        if available_accounts >= 500:
+            buttons.append([
+                InlineKeyboardButton(text="⚡ 500 Views", callback_data=f"view_count:{feature_type}:500"),
+                InlineKeyboardButton(text="🚀 1000 Views", callback_data=f"view_count:{feature_type}:1000")
+            ])
+        
+        if available_accounts >= 1000:
+            buttons.append([
+                InlineKeyboardButton(text="💎 All Accounts", callback_data=f"view_count:{feature_type}:{available_accounts}")
+            ])
+        
+        # Always offer smaller options
+        small_options = []
+        if available_accounts >= 10:
+            small_options.append(InlineKeyboardButton(text="🔟 10 Views", callback_data=f"view_count:{feature_type}:10"))
+        if available_accounts >= 25:
+            small_options.append(InlineKeyboardButton(text="2️⃣5️⃣ 25 Views", callback_data=f"view_count:{feature_type}:25"))
+        if available_accounts >= 50:
+            small_options.append(InlineKeyboardButton(text="5️⃣0️⃣ 50 Views", callback_data=f"view_count:{feature_type}:50"))
+        
+        if small_options:
+            # Split into rows of 2
+            for i in range(0, len(small_options), 2):
+                row = small_options[i:i+2]
+                buttons.append(row)
+        
+        buttons.append([
+            InlineKeyboardButton(text="✏️ Custom Amount", callback_data=f"view_count:{feature_type}:custom")
+        ])
+        buttons.append([
+            InlineKeyboardButton(text="🔙 Back", callback_data=f"view_count_back:{feature_type}")
+        ])
+        
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def time_selection(feature_type: str, view_count: int) -> InlineKeyboardMarkup:
+        """Generate keyboard for selecting time intervals"""
+        buttons = [
+            [
+                InlineKeyboardButton(text="⚡ 1 Min", callback_data=f"time_select:{feature_type}:{view_count}:1"),
+                InlineKeyboardButton(text="🚀 5 Min", callback_data=f"time_select:{feature_type}:{view_count}:5")
+            ],
+            [
+                InlineKeyboardButton(text="⏰ 10 Min", callback_data=f"time_select:{feature_type}:{view_count}:10"),
+                InlineKeyboardButton(text="🕑 30 Min", callback_data=f"time_select:{feature_type}:{view_count}:30")
+            ],
+            [
+                InlineKeyboardButton(text="🕐 1 Hour", callback_data=f"time_select:{feature_type}:{view_count}:60"),
+                InlineKeyboardButton(text="🕕 2 Hours", callback_data=f"time_select:{feature_type}:{view_count}:120")
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Instant", callback_data=f"time_select:{feature_type}:{view_count}:0")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Back", callback_data=f"view_count_back:{feature_type}")
+            ]
+        ]
+        
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def auto_options_selection(feature_type: str, view_count: int, time_minutes: int) -> InlineKeyboardMarkup:
+        """Generate keyboard for auto/manual options selection"""
+        buttons = [
+            [
+                InlineKeyboardButton(text="🤖 Auto Mode", callback_data=f"auto_option:{feature_type}:{view_count}:{time_minutes}:auto")
+            ],
+            [
+                InlineKeyboardButton(text="✋ Manual Mode", callback_data=f"auto_option:{feature_type}:{view_count}:{time_minutes}:manual")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Back", callback_data=f"time_select_back:{feature_type}:{view_count}")
+            ]
+        ]
+        
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def account_count_display(available_accounts: int, feature_type: str = "boost") -> InlineKeyboardMarkup:
+        """Display available accounts with continue button"""
+        buttons = [
+            [
+                InlineKeyboardButton(text="▶️ Continue", callback_data=f"account_count_continue:{feature_type}")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Back", callback_data="boost_views" if feature_type == "boost" else "emoji_reactions")
+            ]
+        ]
+        
+        return InlineKeyboardMarkup(inline_keyboard=buttons)

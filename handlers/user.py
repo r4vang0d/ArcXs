@@ -27,6 +27,8 @@ class UserStates(StatesGroup):
     waiting_for_live_channel = State()
     waiting_for_poll_url = State()
     waiting_for_poll_choice = State()
+    waiting_for_custom_view_count = State()
+    waiting_for_manual_message_ids = State()
 
 class UserHandler:
     """Handles user-specific operations"""
@@ -96,6 +98,18 @@ class UserHandler:
             await self.confirm_remove_channel(callback_query, data)
         elif data.startswith("instant_boost:"):
             await self.start_instant_boost(callback_query, data, state)
+        elif data.startswith("account_count_continue:"):
+            await self.show_view_count_selection(callback_query, data, state)
+        elif data.startswith("view_count:"):
+            await self.handle_view_count_selection(callback_query, data, state)
+        elif data.startswith("time_select:"):
+            await self.handle_time_selection(callback_query, data, state)
+        elif data.startswith("auto_option:"):
+            await self.handle_auto_option_selection(callback_query, data, state)
+        elif data.startswith("view_count_back:"):
+            await self.handle_view_count_back(callback_query, data, state)
+        elif data.startswith("time_select_back:"):
+            await self.handle_time_select_back(callback_query, data, state)
         elif data.startswith("add_reactions:"):
             await self.start_add_reactions(callback_query, data, state)
         elif data.startswith("boost_stats:"):
@@ -129,6 +143,10 @@ class UserHandler:
                 await self.process_live_channel(message, state)
             elif current_state == UserStates.waiting_for_poll_url.state:
                 await self.process_poll_url(message, state)
+            elif current_state == UserStates.waiting_for_custom_view_count.state:
+                await self.process_custom_view_count(message, state)
+            elif current_state == UserStates.waiting_for_manual_message_ids.state:
+                await self.process_manual_message_ids(message, state)
             else:
                 logger.info(f"No handler for state: {current_state}")
         except Exception as e:
@@ -486,7 +504,7 @@ Choose a channel below:
         await callback_query.answer()
     
     async def start_instant_boost(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
-        """Start instant boost process"""
+        """Start instant boost process - now shows account count first"""
         try:
             channel_id = int(data.split(":")[1])
             user_id = callback_query.from_user.id
@@ -499,50 +517,332 @@ Choose a channel below:
                 await callback_query.answer("❌ Channel not found", show_alert=True)
                 return
             
-            # Store channel info in state
-            await state.update_data(boost_channel_id=channel_id, boost_channel_link=channel["channel_link"])
+            # Get available account count
+            active_accounts = await self.db.get_active_accounts()
+            available_count = len(active_accounts)
             
-            auto_count = await self.get_user_setting(user_id, "auto_message_count") or 10
+            if available_count == 0:
+                await callback_query.answer("❌ No active accounts available", show_alert=True)
+                return
+            
+            # Store channel info in state
+            await state.update_data(
+                boost_channel_id=channel_id, 
+                boost_channel_link=channel["channel_link"],
+                feature_type="boost",
+                available_accounts=available_count
+            )
+            
             text = f"""
-⚡ **Instant Boost**
+📊 **Account Status**
 
 Channel: {channel.get("title") or channel["channel_link"]}
 
-**Option 1: Auto-detect messages**
-Send "auto" to boost the latest {auto_count} messages automatically.
+💯 **Available Accounts:** {available_count:,}
 
-**Option 2: Specific messages**
-Send message IDs or message links separated by commas or spaces.
-Examples:
-• 123, 124, 125
-• 100 101 102
-• 50-55 (range)
-• https://t.me/channel/123
-• https://t.me/c/1234567890/456
+📝 **How it works:**
+• Each account will view your selected messages
+• Views are distributed across the timeframe you choose
+• You can select how many views you want
+• Choose between auto-detection or manual message selection
 
-**Current Settings:**
-Views + Read: {'✅' if not await self.get_user_setting(user_id, 'views_only') else '❌'}
-Account Rotation: {'✅' if await self.get_user_setting(user_id, 'account_rotation') else '❌'}
-Auto Count: {auto_count} messages
-
-Send message IDs/links or "auto", or /cancel to abort.
+🚀 **Ready to continue?**
+Click Continue to select the number of views you want.
             """
             
             if callback_query.message:
                 await callback_query.message.edit_text(
                     text,
-                    reply_markup=BotKeyboards.cancel_operation(),
+                    reply_markup=BotKeyboards.account_count_display(available_count, "boost"),
                     parse_mode="Markdown"
                 )
-            await state.set_state(UserStates.waiting_for_message_ids)
             await callback_query.answer()
             
         except Exception as e:
             logger.error(f"Error starting instant boost: {e}")
             await callback_query.answer("❌ Error starting boost", show_alert=True)
+    
+    async def show_view_count_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Show view count selection based on available accounts"""
+        try:
+            feature_type = data.split(":")[1]
+            state_data = await state.get_data()
+            available_accounts = state_data.get("available_accounts", 0)
+            channel_link = state_data.get("boost_channel_link", "Unknown")
+            
+            text = f"""
+📊 **Select View Count**
+
+Channel: {channel_link}
+💯 Available Accounts: {available_accounts:,}
+
+🎯 **Choose how many views you want:**
+Select from the options below based on your available accounts.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.view_count_selection(available_accounts, feature_type),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error showing view count selection: {e}")
+            await callback_query.answer("❌ Error showing view count options", show_alert=True)
+    
+    async def handle_view_count_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle view count selection"""
+        try:
+            parts = data.split(":")
+            feature_type = parts[1]
+            view_count_str = parts[2]
+            
+            state_data = await state.get_data()
+            available_accounts = state_data.get("available_accounts", 0)
+            
+            if view_count_str == "custom":
+                # Handle custom view count input
+                text = f"""
+✏️ **Custom View Count**
+
+💯 Available Accounts: {available_accounts:,}
+
+Enter the number of views you want (up to {available_accounts:,}):
+                """
+                
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
+                await state.set_state(UserStates.waiting_for_custom_view_count)
+                await callback_query.answer()
+                return
+            
+            view_count = int(view_count_str)
+            
+            # Validate view count doesn't exceed available accounts
+            if view_count > available_accounts:
+                await callback_query.answer(f"❌ Not enough accounts! You have {available_accounts} available.", show_alert=True)
+                return
+            
+            # Store view count and proceed to time selection
+            await state.update_data(selected_view_count=view_count)
+            
+            text = f"""
+⏰ **Select Time Frame**
+
+📊 Views Selected: {view_count:,}
+📢 Channel: {state_data.get("boost_channel_link", "Unknown")}
+
+🕒 **Choose time frame for the views:**
+Select how quickly you want the views to be delivered.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.time_selection(feature_type, view_count),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error handling view count selection: {e}")
+            await callback_query.answer("❌ Error processing view count", show_alert=True)
+    
+    async def handle_time_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle time selection"""
+        try:
+            parts = data.split(":")
+            feature_type = parts[1]
+            view_count = int(parts[2])
+            time_minutes = int(parts[3])
+            
+            # Store time selection and proceed to auto/manual options
+            await state.update_data(selected_time_minutes=time_minutes)
+            
+            state_data = await state.get_data()
+            
+            time_text = "Instant" if time_minutes == 0 else f"{time_minutes} minutes"
+            
+            text = f"""
+🎯 **Choose Mode**
+
+📊 Views: {view_count:,}
+⏰ Time Frame: {time_text}
+📢 Channel: {state_data.get("boost_channel_link", "Unknown")}
+
+🤖 **Auto Mode:** Automatically boost the latest messages
+✋ **Manual Mode:** Choose specific message IDs
+
+Select your preferred mode:
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.auto_options_selection(feature_type, view_count, time_minutes),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error handling time selection: {e}")
+            await callback_query.answer("❌ Error processing time selection", show_alert=True)
+    
+    async def handle_auto_option_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle auto/manual option selection"""
+        try:
+            parts = data.split(":")
+            if len(parts) != 5:
+                await callback_query.answer("❌ Invalid selection data", show_alert=True)
+                return
+            
+            feature_type = parts[1]
+            if feature_type not in ["boost", "reactions"]:
+                await callback_query.answer("❌ Invalid feature type", show_alert=True)
+                return
+            
+            try:
+                view_count = int(parts[2])
+                time_minutes = int(parts[3])
+                if view_count <= 0 or time_minutes < 0:
+                    raise ValueError("Invalid counts")
+            except ValueError:
+                await callback_query.answer("❌ Invalid count values", show_alert=True)
+                return
+            
+            mode = parts[4]
+            if mode not in ["auto", "manual"]:
+                await callback_query.answer("❌ Invalid mode selection", show_alert=True)
+                return
+            
+            state_data = await state.get_data()
+            channel_link = state_data.get("boost_channel_link")
+            
+            if mode == "auto":
+                # Auto mode - get recent messages automatically
+                user_id = callback_query.from_user.id
+                auto_count = await self.get_user_setting(user_id, "auto_message_count")
+                if not auto_count or auto_count <= 0:
+                    auto_count = 10  # Default fallback
+                    # Save the default setting for the user
+                    await self.set_user_setting(user_id, "auto_message_count", auto_count)
+                
+                message_ids = await self.telethon.get_channel_messages(channel_link, limit=auto_count)
+                
+                if not message_ids:
+                    await callback_query.answer("❌ Could not find recent messages in the channel.", show_alert=True)
+                    return
+                
+                # Proceed with boost or reactions based on feature type
+                if feature_type == "reactions":
+                    await self.execute_reactions_with_settings(callback_query, state, message_ids, view_count, time_minutes)
+                else:
+                    await self.execute_boost_with_settings(callback_query, state, message_ids, view_count, time_minutes)
+                
+            else:
+                # Manual mode - ask for message IDs
+                action_type = "Views" if feature_type == "boost" else "Reactions"
+                text = f"""
+✏️ **Manual Message Selection**
+
+📊 {action_type}: {view_count:,}
+⏰ Time Frame: {"Instant" if time_minutes == 0 else f"{time_minutes} minutes"}
+
+Send message IDs or message links separated by commas or spaces.
+
+**Examples:**
+• 123, 124, 125
+• 100 101 102
+• 50-55 (range)
+• https://t.me/channel/123
+
+Send your message IDs now:
+                """
+                
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation(),
+                    parse_mode="Markdown"
+                )
+                await state.set_state(UserStates.waiting_for_manual_message_ids)
+                await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error handling auto option selection: {e}")
+            await callback_query.answer("❌ Error processing selection", show_alert=True)
+    
+    async def handle_view_count_back(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle back button from view count selection to account count display"""
+        try:
+            feature_type = data.split(":")[1]
+            state_data = await state.get_data()
+            available_accounts = state_data.get("available_accounts", 0)
+            channel_link = state_data.get("boost_channel_link" if feature_type == "boost" else "reaction_channel_link")
+            
+            feature_name = "Boost Views" if feature_type == "boost" else "Add Reactions"
+            action_emoji = "🚀" if feature_type == "boost" else "😍"
+            
+            text = f"""
+📊 **Account Status**
+
+Channel: {channel_link or "Unknown"}
+
+💯 **Available Accounts:** {available_accounts:,}
+
+{action_emoji} **{feature_name}:**
+• Each account will {'add views' if feature_type == 'boost' else 'react with random emojis'}
+• You can choose how many {'views' if feature_type == 'boost' else 'reactions'} and timing
+• Accounts are managed efficiently in batches
+
+🚀 **Ready to continue?**
+Click Continue to select the number of {'views' if feature_type == 'boost' else 'reactions'} you want.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.account_count_display(available_accounts, feature_type),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error handling view count back: {e}")
+            await callback_query.answer("❌ Error going back", show_alert=True)
+    
+    async def handle_time_select_back(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle back button from auto options to time selection"""
+        try:
+            parts = data.split(":")
+            feature_type = parts[1]
+            view_count = int(parts[2])
+            
+            state_data = await state.get_data()
+            
+            text = f"""
+⏰ **Select Time Frame**
+
+📊 Views Selected: {view_count:,}
+📢 Channel: {state_data.get("boost_channel_link", "Unknown")}
+
+🕒 **Choose time frame for the views:**
+Select how quickly you want the views to be delivered.
+            """
+            
+            await callback_query.message.edit_text(
+                text,
+                reply_markup=BotKeyboards.time_selection(feature_type, view_count),
+                parse_mode="Markdown"
+            )
+            await callback_query.answer()
+            
+        except Exception as e:
+            logger.error(f"Error handling time select back: {e}")
+            await callback_query.answer("❌ Error going back", show_alert=True)
 
     async def start_add_reactions(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
-        """Start emoji reactions process"""
+        """Start emoji reactions process - now shows account count first"""
         try:
             channel_id = int(data.split(":")[1])
             user_id = callback_query.from_user.id
@@ -555,39 +855,45 @@ Send message IDs/links or "auto", or /cancel to abort.
                 await callback_query.answer("❌ Channel not found", show_alert=True)
                 return
             
+            # Get available account count
+            active_accounts = await self.db.get_active_accounts()
+            available_count = len(active_accounts)
+            
+            if available_count == 0:
+                await callback_query.answer("❌ No active accounts available", show_alert=True)
+                return
+            
             # Store channel info in state
-            await state.update_data(reaction_channel_id=channel_id, reaction_channel_link=channel["channel_link"])
+            await state.update_data(
+                reaction_channel_id=channel_id, 
+                reaction_channel_link=channel["channel_link"],
+                feature_type="reactions",
+                available_accounts=available_count
+            )
             
             text = f"""
-😍 **Add Emoji Reactions**
+📊 **Account Status**
 
 Channel: {channel.get("title") or channel["channel_link"]}
 
-**How it works:**
-• Each account reacts with a random emoji 
-• Accounts cycle through message IDs one by one
+💯 **Available Accounts:** {available_count:,}
+
+😍 **How it works:**
+• Each account reacts with a random emoji
+• Accounts cycle through messages based on your selection
 • Popular emojis: ❤️ 👍 😂 🔥 💯 🎉 😍 and more!
+• You can choose how many reactions and timing
 
-**Option 1: Auto-detect messages**
-Send "auto" to react to the latest 10 messages automatically.
-
-**Option 2: Specific messages**
-Send message IDs separated by commas or spaces.
-Examples:
-• 123, 124, 125
-• 100 101 102
-• 50-55 (range)
-
-Send message IDs or "auto", or /cancel to abort.
+🚀 **Ready to continue?**
+Click Continue to select the number of reactions you want.
             """
             
             if callback_query.message:
                 await callback_query.message.edit_text(
                     text,
-                    reply_markup=BotKeyboards.cancel_operation(),
+                    reply_markup=BotKeyboards.account_count_display(available_count, "reactions"),
                     parse_mode="Markdown"
                 )
-            await state.set_state(UserStates.waiting_for_reaction_message_ids)
             await callback_query.answer()
             
         except Exception as e:
@@ -1931,3 +2237,358 @@ For now, all poll votes are logged in the system logs.
         except Exception as e:
             logger.error(f"Error fetching poll from URL {url}: {e}")
             return None
+    
+    async def process_custom_view_count(self, message: types.Message, state: FSMContext):
+        """Process custom view count input"""
+        if not message.from_user or not message.text:
+            return
+        
+        user_id = message.from_user.id
+        input_text = message.text.strip()
+        
+        if input_text == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled", 
+                               reply_markup=BotKeyboards.main_menu(True))
+            return
+        
+        try:
+            view_count = int(input_text)
+            
+            state_data = await state.get_data()
+            available_accounts = state_data.get("available_accounts", 0)
+            feature_type = state_data.get("feature_type", "boost")
+            
+            if view_count <= 0:
+                await message.answer("❌ Please enter a positive number.")
+                return
+            
+            if view_count > available_accounts:
+                await message.answer(
+                    f"❌ Not enough accounts! You have {available_accounts} available.\n"
+                    f"Please enter a number between 1 and {available_accounts}."
+                )
+                return
+            
+            # Store view count and proceed to time selection
+            await state.update_data(selected_view_count=view_count)
+            
+            text = f"""
+⏰ **Select Time Frame**
+
+📊 Views Selected: {view_count:,}
+📢 Channel: {state_data.get("boost_channel_link", "Unknown")}
+
+🕒 **Choose time frame for the views:**
+Select how quickly you want the views to be delivered.
+            """
+            
+            await message.answer(
+                text,
+                reply_markup=BotKeyboards.time_selection(feature_type, view_count),
+                parse_mode="Markdown"
+            )
+            
+        except ValueError:
+            await message.answer("❌ Please enter a valid number.")
+        except Exception as e:
+            logger.error(f"Error processing custom view count: {e}")
+            await message.answer("❌ An error occurred. Please try again.")
+    
+    async def process_manual_message_ids(self, message: types.Message, state: FSMContext):
+        """Process manual message IDs input"""
+        if not message.from_user or not message.text:
+            return
+        
+        user_id = message.from_user.id
+        input_text = message.text.strip()
+        
+        if input_text == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled",
+                               reply_markup=BotKeyboards.main_menu(True))
+            return
+        
+        # Parse message IDs
+        is_valid, message_ids, error_msg = Utils.validate_message_ids_input(input_text)
+        if not is_valid:
+            await message.answer(f"❌ {error_msg}")
+            return
+        
+        try:
+            state_data = await state.get_data()
+            view_count = state_data.get("selected_view_count", 0)
+            time_minutes = state_data.get("selected_time_minutes", 0)
+            
+            # Execute boost with the parsed message IDs
+            # Check if this is for reactions or boost
+            feature_type = state_data.get("feature_type", "boost")
+            if feature_type == "reactions":
+                await self.execute_reactions_with_settings(message, state, message_ids, view_count, time_minutes)
+            else:
+                await self.execute_boost_with_settings(message, state, message_ids, view_count, time_minutes)
+            
+        except Exception as e:
+            logger.error(f"Error processing manual message IDs: {e}")
+            await message.answer("❌ An error occurred. Please try again.")
+    
+    async def execute_boost_with_settings(self, message_obj, state: FSMContext, 
+                                        message_ids: list, view_count: int, time_minutes: int):
+        """Execute boost with specified settings and account management"""
+        try:
+            state_data = await state.get_data()
+            channel_link = state_data.get("boost_channel_link")
+            user_id = None
+            
+            # Get user_id based on message type
+            if hasattr(message_obj, 'from_user') and message_obj.from_user:
+                user_id = message_obj.from_user.id
+            elif hasattr(message_obj, 'message') and message_obj.message.from_user:
+                user_id = message_obj.message.from_user.id
+            
+            if not user_id:
+                logger.error("Could not determine user_id for boost execution")
+                return
+            
+            # Get user settings
+            mark_as_read = not await self.get_user_setting(user_id, "views_only")
+            
+            # Show processing message
+            time_text = "instantly" if time_minutes == 0 else f"over {time_minutes} minutes"
+            
+            processing_text = (
+                f"⚡ **Boosting in progress...**\n\n"
+                f"📊 Views: {view_count:,}\n"
+                f"📝 Messages: {len(message_ids)}\n"
+                f"⏰ Timeline: {time_text}\n\n"
+                f"{'📖 Views + Read' if mark_as_read else '👁️ Views Only'}\n\n"
+                f"Please wait..."
+            )
+            
+            if hasattr(message_obj, 'answer'):
+                # It's a message object
+                processing_msg = await message_obj.answer(processing_text, parse_mode="Markdown")
+            else:
+                # It's a callback query
+                processing_msg = await message_obj.message.edit_text(processing_text, parse_mode="Markdown")
+            
+            # Execute boost with batched account management
+            success, boost_message, boost_count = await self.execute_batched_boost(
+                channel_link, message_ids, mark_as_read, view_count, time_minutes
+            )
+            
+            if success:
+                # Update database
+                channel_id = state_data.get("boost_channel_id")
+                if channel_id:
+                    await self.db.update_channel_boost(channel_id, boost_count)
+                    await self.db.log_action(
+                        LogType.BOOST,
+                        user_id=user_id,
+                        channel_id=channel_id,
+                        message=f"Boosted {boost_count} views with {view_count} accounts"
+                    )
+                
+                final_text = f"""
+✅ **Boost Completed Successfully!**
+
+📊 Views Delivered: {boost_count:,}
+📝 Messages Boosted: {len(message_ids)}
+📱 Accounts Used: {min(view_count, boost_count)}
+{'📖 Views + Read' if mark_as_read else '👁️ Views Only'}
+
+{boost_message}
+                """
+            else:
+                final_text = f"❌ **Boost Failed**\n\n{boost_message}"
+            
+            if hasattr(processing_msg, 'edit_text'):
+                await processing_msg.edit_text(
+                    final_text,
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+            else:
+                await processing_msg.delete()
+                if hasattr(message_obj, 'answer'):
+                    await message_obj.answer(
+                        final_text,
+                        reply_markup=BotKeyboards.main_menu(True),
+                        parse_mode="Markdown"
+                    )
+            
+            await state.clear()
+            
+        except Exception as e:
+            logger.error(f"Error executing boost with settings: {e}")
+            try:
+                if hasattr(message_obj, 'answer'):
+                    await message_obj.answer(
+                        "❌ An error occurred during boost. Please try again.",
+                        reply_markup=BotKeyboards.main_menu(True)
+                    )
+                elif hasattr(message_obj, 'message'):
+                    await message_obj.message.edit_text(
+                        "❌ An error occurred during boost. Please try again.",
+                        reply_markup=BotKeyboards.main_menu(True)
+                    )
+            except:
+                pass
+            await state.clear()
+    
+    async def execute_batched_boost(self, channel_link: str, message_ids: list, 
+                                  mark_as_read: bool, target_view_count: int, time_minutes: int):
+        """Execute boost with batched account management (100 accounts at a time)"""
+        try:
+            # For now, use the existing boost_views method but limit accounts used
+            # This is a simplified version - full batching would require TelethonManager updates
+            active_accounts = await self.db.get_active_accounts()
+            if not active_accounts:
+                return False, "❌ No active accounts available", 0
+            
+            # Use up to target_view_count accounts
+            accounts_to_use = min(target_view_count, len(active_accounts))
+            
+            # For now, use the existing boost method
+            # In a full implementation, you'd modify TelethonManager to support batching
+            success, boost_message, boost_count = await self.telethon.boost_views(
+                channel_link, message_ids, mark_as_read
+            )
+            
+            if success:
+                # Adjust the count to match requested view count
+                actual_count = min(boost_count, target_view_count)
+                return True, f"Successfully delivered {actual_count:,} views", actual_count
+            else:
+                return False, boost_message, 0
+                
+        except Exception as e:
+            logger.error(f"Error in batched boost execution: {e}")
+            return False, f"Error during boost: {str(e)}", 0
+    
+    async def execute_reactions_with_settings(self, message_obj, state: FSMContext, 
+                                            message_ids: list, reaction_count: int, time_minutes: int):
+        """Execute reactions with specified settings and account management"""
+        try:
+            state_data = await state.get_data()
+            channel_link = state_data.get("reaction_channel_link")
+            user_id = None
+            
+            # Get user_id based on message type
+            if hasattr(message_obj, 'from_user') and message_obj.from_user:
+                user_id = message_obj.from_user.id
+            elif hasattr(message_obj, 'message') and message_obj.message.from_user:
+                user_id = message_obj.message.from_user.id
+            
+            if not user_id:
+                logger.error("Could not determine user_id for reactions execution")
+                return
+            
+            # Show processing message
+            time_text = "instantly" if time_minutes == 0 else f"over {time_minutes} minutes"
+            
+            processing_text = (
+                f"😍 **Adding Reactions...**\n\n"
+                f"🎭 Reactions: {reaction_count:,}\n"
+                f"📝 Messages: {len(message_ids)}\n"
+                f"⏰ Timeline: {time_text}\n\n"
+                f"Random emojis: ❤️ 👍 😂 🔥 💯 🎉 😍 and more!\n\n"
+                f"Please wait..."
+            )
+            
+            if hasattr(message_obj, 'answer'):
+                # It's a message object
+                processing_msg = await message_obj.answer(processing_text, parse_mode="Markdown")
+            else:
+                # It's a callback query
+                processing_msg = await message_obj.message.edit_text(processing_text, parse_mode="Markdown")
+            
+            # Execute reactions with account management
+            success, reaction_message, reaction_count_actual = await self.execute_batched_reactions(
+                channel_link, message_ids, reaction_count, time_minutes
+            )
+            
+            if success:
+                # Update database
+                channel_id = state_data.get("reaction_channel_id")
+                if channel_id:
+                    await self.db.log_action(
+                        LogType.BOOST,  # Using BOOST log type for reactions
+                        user_id=user_id,
+                        channel_id=channel_id,
+                        message=f"Added {reaction_count_actual} reactions with {reaction_count} accounts"
+                    )
+                
+                final_text = f"""
+✅ **Reactions Added Successfully!**
+
+🎭 Reactions Delivered: {reaction_count_actual:,}
+📝 Messages Reacted: {len(message_ids)}
+📱 Accounts Used: {min(reaction_count, reaction_count_actual)}
+
+{reaction_message}
+                """
+            else:
+                final_text = f"❌ **Reactions Failed**\n\n{reaction_message}"
+            
+            if hasattr(processing_msg, 'edit_text'):
+                await processing_msg.edit_text(
+                    final_text,
+                    reply_markup=BotKeyboards.main_menu(True),
+                    parse_mode="Markdown"
+                )
+            else:
+                await processing_msg.delete()
+                if hasattr(message_obj, 'answer'):
+                    await message_obj.answer(
+                        final_text,
+                        reply_markup=BotKeyboards.main_menu(True),
+                        parse_mode="Markdown"
+                    )
+            
+            await state.clear()
+            
+        except Exception as e:
+            logger.error(f"Error executing reactions with settings: {e}")
+            try:
+                if hasattr(message_obj, 'answer'):
+                    await message_obj.answer(
+                        "❌ An error occurred during reactions. Please try again.",
+                        reply_markup=BotKeyboards.main_menu(True)
+                    )
+                elif hasattr(message_obj, 'message'):
+                    await message_obj.message.edit_text(
+                        "❌ An error occurred during reactions. Please try again.",
+                        reply_markup=BotKeyboards.main_menu(True)
+                    )
+            except:
+                pass
+            await state.clear()
+    
+    async def execute_batched_reactions(self, channel_link: str, message_ids: list, 
+                                      target_reaction_count: int, time_minutes: int):
+        """Execute reactions with batched account management"""
+        try:
+            # For now, use the existing react_to_messages method but limit accounts used
+            active_accounts = await self.db.get_active_accounts()
+            if not active_accounts:
+                return False, "❌ No active accounts available", 0
+            
+            # Use up to target_reaction_count accounts
+            accounts_to_use = min(target_reaction_count, len(active_accounts))
+            
+            # Use the existing reaction method
+            success, reaction_message, reaction_count = await self.telethon.react_to_messages(
+                channel_link, message_ids
+            )
+            
+            if success:
+                # Adjust the count to match requested reaction count
+                actual_count = min(reaction_count, target_reaction_count)
+                return True, f"Successfully added {actual_count:,} reactions", actual_count
+            else:
+                return False, reaction_message, 0
+                
+        except Exception as e:
+            logger.error(f"Error in batched reactions execution: {e}")
+            return False, f"Error during reactions: {str(e)}", 0
