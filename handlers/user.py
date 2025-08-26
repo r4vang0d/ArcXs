@@ -724,6 +724,10 @@ Select your preferred mode:
             else:  # reactions
                 channel_link = state_data.get("reaction_channel_link")
             
+            # Debug logging to check state data
+            logger.info(f"🔍 DEBUG: State data keys: {list(state_data.keys())}")
+            logger.info(f"🔍 DEBUG: Feature type: {feature_type}, Channel link: {channel_link}")
+            
             if mode == "auto":
                 # Auto mode - get recent messages automatically
                 user_id = callback_query.from_user.id
