@@ -248,14 +248,34 @@ class DatabaseManager:
     async def add_account(self, phone: str, session_name: str, username: Optional[str] = None) -> bool:
         """Add a new Telethon account"""
         try:
-            await self._execute_with_lock("""
-                INSERT INTO accounts (phone, username, session_name, status)
-                VALUES (?, ?, ?, ?)
-            """, (phone, username, session_name, AccountStatus.ACTIVE.value))
-            await self._commit_with_lock()
-            display_name = username if username else phone
-            await self.log_action(LogType.JOIN, message=f"Account {display_name} added successfully")
-            return True
+            # Check if account already exists
+            existing = await self._execute_with_lock("""
+                SELECT phone, username, session_name FROM accounts 
+                WHERE phone = ? OR session_name = ?
+            """, (phone, session_name))
+            
+            if existing:
+                logger.info(f"Account {phone} already exists in database, updating if needed")
+                # Update existing account
+                await self._execute_with_lock("""
+                    UPDATE accounts 
+                    SET username = ?, status = ?
+                    WHERE phone = ? OR session_name = ?
+                """, (username, AccountStatus.ACTIVE.value, phone, session_name))
+                await self._commit_with_lock()
+                display_name = username if username else phone
+                await self.log_action(LogType.JOIN, message=f"Account {display_name} updated successfully")
+                return True
+            else:
+                # Add new account
+                await self._execute_with_lock("""
+                    INSERT INTO accounts (phone, username, session_name, status)
+                    VALUES (?, ?, ?, ?)
+                """, (phone, username, session_name, AccountStatus.ACTIVE.value))
+                await self._commit_with_lock()
+                display_name = username if username else phone
+                await self.log_action(LogType.JOIN, message=f"Account {display_name} added successfully")
+                return True
         except Exception as e:
             logger.error(f"Error adding account {phone}: {e}")
             return False

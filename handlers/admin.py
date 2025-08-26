@@ -287,25 +287,33 @@ Send the code or /cancel to abort.
         processing_msg = await message.answer("⏳ Verifying code... Please wait.")
         
         try:
-            success, result_message, updated_verification_data = await self.telethon.complete_account_verification(verification_data, code)
+            # Handle both 2-value and 3-value returns from complete_account_verification
+            result = await self.telethon.complete_account_verification(verification_data, code)
             
             await processing_msg.delete()
+            
+            if len(result) == 3:
+                # 2FA case: (success, message, updated_verification_data)
+                success, result_message, updated_verification_data = result
+                if not success and updated_verification_data and updated_verification_data.get('needs_2fa'):
+                    # 2FA required - transition to 2FA state
+                    await state.update_data(verification_data=updated_verification_data)
+                    await state.set_state(AdminStates.waiting_for_2fa_password)
+                    await message.answer(
+                        f"🔐 **Two-Factor Authentication Required**\n\n{result_message}\n\nEnter your 2FA password or /cancel to abort:",
+                        parse_mode="Markdown",
+                        reply_markup=BotKeyboards.cancel_operation()
+                    )
+                    return
+            else:
+                # Normal case: (success, message)
+                success, result_message = result
             
             if success:
                 await message.answer(
                     f"{result_message}\n\n🎉 Account successfully added and ready for use!",
                     reply_markup=BotKeyboards.account_management()
                 )
-            elif updated_verification_data and updated_verification_data.get('needs_2fa'):
-                # 2FA required - transition to 2FA state
-                await state.update_data(verification_data=updated_verification_data)
-                await state.set_state(AdminStates.waiting_for_2fa_password)
-                await message.answer(
-                    f"🔐 **Two-Factor Authentication Required**\n\n{result_message}\n\nEnter your 2FA password or /cancel to abort:",
-                    parse_mode="Markdown",
-                    reply_markup=BotKeyboards.cancel_operation()
-                )
-                return
             else:
                 await message.answer(
                     f"{result_message}\n\nPlease try again or /cancel to abort.",

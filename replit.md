@@ -6,10 +6,13 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 
 # Recent Changes
 
-## August 26, 2025 - Multi-Account Join Fix
+## August 26, 2025 - Multi-Account Join Fix & Error Handling
 - **Live Management Multi-Account Fix**: Fixed issue where only one account was joining live streams during monitoring by removing temporary debugging code that limited to single account
 - **All Accounts Joining**: Both accounts now properly join live streams when detected during live management monitoring
 - **Account Selection Logic**: Restored proper account selection logic that respects user preferences (specific count vs all accounts)
+- **Admin Handler Error Fix**: Fixed "not enough values to unpack" error in account verification by handling both 2-value and 3-value returns from verification method
+- **Database Constraint Fix**: Fixed UNIQUE constraint errors when adding existing accounts by implementing upsert logic (update if exists, insert if new)
+- **Account Addition Stability**: Account addition process now gracefully handles duplicate accounts and updates existing records instead of failing
 
 ## August 26, 2025 - Final Resolution
 - **Permanent Group Call Presence**: Fixed accounts automatically leaving after mute/unmute behavior ends by implementing continuous presence system
