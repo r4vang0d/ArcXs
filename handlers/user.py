@@ -728,6 +728,12 @@ Select your preferred mode:
             logger.info(f"🔍 DEBUG: State data keys: {list(state_data.keys())}")
             logger.info(f"🔍 DEBUG: Feature type: {feature_type}, Channel link: {channel_link}")
             
+            # Check if we have the required channel link
+            if not channel_link:
+                error_msg = f"❌ Channel information not found. Please start the {feature_type} process again."
+                await callback_query.answer(error_msg, show_alert=True)
+                return
+            
             if mode == "auto":
                 # Auto mode - get recent messages automatically
                 user_id = callback_query.from_user.id
