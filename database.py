@@ -332,6 +332,22 @@ class DatabaseManager:
             logger.error(f"Error getting active accounts: {e}")
             return []
     
+    async def get_active_account_count(self) -> int:
+        """Get count of active accounts available for use"""
+        try:
+            now = datetime.now()
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                async with connection.execute("""
+                    SELECT COUNT(*) FROM accounts 
+                    WHERE status = ? AND (flood_wait_until IS NULL OR flood_wait_until < ?)
+                """, (AccountStatus.ACTIVE.value, now)) as cursor:
+                    result = await cursor.fetchone()
+                    return result[0] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting active account count: {e}")
+            return 0
+    
     async def update_account_status(self, account_id: int, status: AccountStatus, 
                                   flood_wait_until: Optional[datetime] = None) -> bool:
         """Update account status"""

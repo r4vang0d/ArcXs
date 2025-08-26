@@ -691,7 +691,7 @@ Select your preferred mode:
             await callback_query.answer("❌ Error processing time selection", show_alert=True)
     
     async def handle_auto_option_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
-        """Handle auto/manual option selection"""
+        """Handle auto/manual option selection with improved state management"""
         try:
             parts = data.split(":")
             if len(parts) != 5:
@@ -719,20 +719,40 @@ Select your preferred mode:
             
             state_data = await state.get_data()
             # Get the appropriate channel link based on feature type
-            if feature_type == "boost":
-                channel_link = state_data.get("boost_channel_link")
-            else:  # reactions
-                channel_link = state_data.get("reaction_channel_link")
+            channel_link_key = "boost_channel_link" if feature_type == "boost" else "reaction_channel_link"
+            channel_id_key = "boost_channel_id" if feature_type == "boost" else "reaction_channel_id"
+            channel_link = state_data.get(channel_link_key)
+            channel_id = state_data.get(channel_id_key)
             
             # Debug logging to check state data
             logger.info(f"🔍 DEBUG: State data keys: {list(state_data.keys())}")
-            logger.info(f"🔍 DEBUG: Feature type: {feature_type}, Channel link: {channel_link}")
+            logger.info(f"🔍 DEBUG: Feature type: {feature_type}, Channel link: {channel_link}, Channel ID: {channel_id}")
             
-            # Check if we have the required channel link
-            if not channel_link:
+            # Check if we have the required channel information
+            if not channel_link or not channel_id:
                 error_msg = f"❌ Channel information not found. Please start the {feature_type} process again."
                 await callback_query.answer(error_msg, show_alert=True)
+                # Navigate back to main menu to prevent user confusion
+                await callback_query.message.edit_text(
+                    "❌ Session expired. Please restart the process.",
+                    reply_markup=BotKeyboards.main_menu(True)
+                )
+                await state.clear()  # Clear potentially corrupted state
                 return
+                
+            # Ensure all required state data is present and restore if needed
+            if not state_data.get("feature_type"):
+                await state.update_data(feature_type=feature_type)
+            if not state_data.get("selected_view_count"):
+                await state.update_data(selected_view_count=view_count)
+            if not state_data.get("selected_time_minutes"):
+                await state.update_data(selected_time_minutes=time_minutes)
+            if not state_data.get("available_accounts"):
+                # Get account count to ensure state consistency
+                available_accounts = await self.db.get_active_account_count()
+                await state.update_data(available_accounts=available_accounts)
+            
+            logger.info(f"✅ State validation complete for {feature_type} with {view_count} views over {time_minutes} minutes")
             
             if mode == "auto":
                 # Auto mode - get recent messages automatically
