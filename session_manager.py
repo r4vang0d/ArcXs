@@ -1253,6 +1253,13 @@ class TelethonManager:
                     if "ended" in error_str or "not found" in error_str:
                         logger.info(f"🔴 Group call {call_id} ended - stopping behavior for {session_name}")
                         break
+                    elif "disconnected" in error_str or "connection" in error_str:
+                        logger.warning(f"🔄 Connection lost for {session_name}, attempting auto-rejoin...")
+                        # Auto-rejoin on connection loss (as suggested in guide)
+                        rejoin_success = await self._auto_rejoin_group_call(client, session_name, group_call, group_call_info, entity)
+                        if not rejoin_success:
+                            logger.error(f"❌ Auto-rejoin failed for {session_name}")
+                            break
                     else:
                         logger.warning(f"⚠️ Behavior error for {session_name}: {e}")
                         # Continue trying after short delay
@@ -1289,6 +1296,13 @@ class TelethonManager:
                     if "ended" in error_str or "not found" in error_str:
                         logger.info(f"🔴 Group call {call_id} ended - stopping listener for {session_name}")
                         break
+                    elif "disconnected" in error_str or "connection" in error_str:
+                        logger.warning(f"🔄 Listener connection lost for {session_name}, attempting auto-rejoin...")
+                        # Auto-rejoin for listeners too
+                        rejoin_success = await self._auto_rejoin_group_call(client, session_name, group_call, group_call_info, None)
+                        if not rejoin_success:
+                            logger.error(f"❌ Listener auto-rejoin failed for {session_name}")
+                            break
                     else:
                         logger.warning(f"⚠️ Listener presence error for {session_name}: {e}")
                         await asyncio.sleep(60)
@@ -1303,8 +1317,10 @@ class TelethonManager:
         max_retries = 5
         for retry in range(max_retries):
             if retry > 0:
-                retry_delay = random.randint(10, 20)
-                logger.info(f"🔄 Retry {retry}/{max_retries} for {session_name} in {retry_delay}s")
+                # Exponential backoff: 1s → 3s → 10s → 30s → 60s (as suggested in guide)
+                backoff_delays = [1, 3, 10, 30, 60]
+                retry_delay = backoff_delays[min(retry - 1, len(backoff_delays) - 1)]
+                logger.info(f"🔄 Retry {retry}/{max_retries} for {session_name} in {retry_delay}s (exponential backoff)")
                 await asyncio.sleep(retry_delay)
                 
                 # Get completely fresh group call info for each retry
@@ -1332,6 +1348,42 @@ class TelethonManager:
         
         logger.error(f"❌ All retries exhausted for {session_name}")
         return False
+
+    async def _auto_rejoin_group_call(self, client, session_name, group_call, group_call_info, entity):
+        """Auto-rejoin group call when dropped (as suggested in guide)"""
+        logger.info(f"🔄 Attempting auto-rejoin for {session_name}")
+        
+        try:
+            # Step 1: Get fresh group call info (mandatory per guide)
+            from telethon.tl.functions.phone import GetGroupCallRequest
+            fresh_call_info = await client(GetGroupCallRequest(
+                call=group_call,
+                limit=1
+            ))
+            
+            # Step 2: Rejoin with fresh WebRTC parameters
+            webrtc_params = self._generate_webrtc_params(session_name, group_call_info['id'])
+            from telethon.tl.functions.phone import JoinGroupCallRequest
+            from telethon.tl.types import DataJSON
+            import json
+            
+            params = DataJSON(data=json.dumps(webrtc_params))
+            me = await client.get_me()
+            
+            await client(JoinGroupCallRequest(
+                call=group_call,
+                join_as=me,
+                muted=True,
+                video_stopped=True,
+                params=params
+            ))
+            
+            logger.info(f"✅ Account {session_name} successfully rejoined group call")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Auto-rejoin failed for {session_name}: {e}")
+            return False
 
     async def _try_alternative_join_methods(self, client, session_name, group_call, group_call_info, entity, me):
         """Try multiple alternative methods to join group call for problematic accounts"""

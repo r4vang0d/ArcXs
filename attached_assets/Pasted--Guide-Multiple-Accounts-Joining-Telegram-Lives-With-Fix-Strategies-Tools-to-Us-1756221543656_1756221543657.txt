@@ -1,0 +1,92 @@
+📖 Guide: Multiple Accounts Joining Telegram Lives (With Fix Strategies)
+
+
+---
+
+🛠️ Tools to Use
+
+Telethon → for session management, detecting if a channel has a live, joining the live, mute/unmute, and requesting to speak.
+
+PyTgCalls → for stable call connections, automatic ping/keepalive (so you never drop), and easier audio handling.
+
+Asyncio (Python built-in) → to run multiple accounts simultaneously in one script.
+
+
+
+---
+
+🔧 Fix Strategies (for all common issues)
+
+1. Fresh Group Call Info
+
+Always fetch a new GetGroupCallRequest before joining.
+
+Never reuse old group call IDs (they expire).
+
+
+
+2. Retry on Failure
+
+If joining fails, wait a few seconds and try again.
+
+Use exponential backoff (1s → 3s → 10s → 30s…) to avoid Telegram flood-wait errors.
+
+
+
+3. Auto-Rejoin if Dropped
+
+If an account disconnects or gets dropped, fetch fresh group call info and rejoin immediately.
+
+
+
+4. Heartbeat / Keep Alive
+
+Use PyTgCalls to send pings automatically.
+
+Without this, Telegram will think the client is idle and drop it.
+
+
+
+5. Stay Until Admin Ends
+
+Never leave by yourself.
+
+Only exit if the call is officially marked as ended.
+
+
+
+6. Multi-Account Isolation
+
+Each account must have its own .session file.
+
+Run each in a separate async task to prevent collisions.
+
+
+
+7. Mute/Unmute Logic
+
+If admin approves request-to-speak → randomly toggle mute/unmute at intervals.
+
+If denied → stay muted but remain inside the live.
+
+
+
+
+
+---
+
+🚀 Features (All Mandatory)
+
+Multiple accounts supported (all using same API ID/Hash, separate session files).
+
+Automatic joining of lives as soon as they start.
+
+Persistence → accounts never quit unless the live ends.
+
+Error recovery → auto-retry and rejoin on any error or drop.
+
+Admin interaction → can raise hand, detect approval/denial, and react accordingly.
+
+Mute/unmute simulation when approved, to look like active participants.
+
+Logging/monitoring → track which accounts are inside the live at all times.

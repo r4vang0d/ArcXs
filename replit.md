@@ -11,6 +11,10 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 - **All Accounts Joining**: All 3 accounts now properly join live streams when detected during live management monitoring
 - **Fresh Group Call Info**: Each account gets fresh group call information to avoid "invalid group call" errors
 - **Advanced Retry System**: Implemented comprehensive retry mechanism with up to 5 attempts per account with fresh group call data each time
+- **Exponential Backoff**: Added smart retry delays (1s → 3s → 10s → 30s → 60s) to avoid flood-wait errors
+- **Auto-Rejoin on Drop**: Accounts automatically rejoin if disconnected or dropped from group calls with fresh parameters
+- **Realistic Raise Hand**: Implemented proper "raise hand" functionality using EditGroupCallParticipantRequest with raise_hand=True
+- **Admin Approval Detection**: Bot monitors participant status to detect speaking permission approval/denial
 - **Persistent Connection Management**: Accounts maintain indefinite presence in group calls until the owner ends the live stream
 - **Smart Rate Limiting**: Reduced delays between joins while maintaining stability (2-5 second intervals)
 - **Admin Handler Error Fix**: Fixed "not enough values to unpack" error in account verification by handling both 2-value and 3-value returns from verification method
