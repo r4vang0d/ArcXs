@@ -803,13 +803,17 @@ class TelethonManager:
         accounts_joined = 0
         failed_accounts = []
         
+        # TEMPORARY: Test with only second account to debug the issue
+        accounts_to_use = ["session_919031569809"] if "session_919031569809" in self.active_clients else self.active_clients
+        logger.info(f"🧪 TESTING: Using only second account for debugging: {accounts_to_use}")
+        
         # Determine which accounts to use
-        accounts_to_use = self.active_clients
-        if max_accounts and max_accounts > 0:
-            accounts_to_use = self.active_clients[:max_accounts]
-            logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
-        else:
-            logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
+        # accounts_to_use = self.active_clients
+        # if max_accounts and max_accounts > 0:
+        #     accounts_to_use = self.active_clients[:max_accounts]
+        #     logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
+        # else:
+        #     logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
         
         try:
             for i, session_name in enumerate(accounts_to_use):
@@ -966,11 +970,42 @@ class TelethonManager:
                             
                             # For the problematic second account, log detailed account info for debugging
                             if session_name == "session_919031569809":
-                                logger.error(f"🚫 ACCOUNT RESTRICTION: {session_name} cannot join group calls")
+                                logger.error(f"🚫 DETAILED DEBUG FOR {session_name}:")
                                 logger.error(f"   ↳ Account ID: {me.id}")
-                                logger.error(f"   ↳ Error: {group_call_error}")
-                                logger.error(f"   ↳ This account may have limitations preventing group call access")
-                                logger.error(f"   ↳ Consider using a different account or verifying account status")
+                                logger.error(f"   ↳ Username: {getattr(me, 'username', 'None')}")
+                                logger.error(f"   ↳ Phone: {getattr(me, 'phone', 'None')}")
+                                logger.error(f"   ↳ Verified: {getattr(me, 'verified', 'Unknown')}")
+                                logger.error(f"   ↳ Bot: {getattr(me, 'bot', 'Unknown')}")
+                                logger.error(f"   ↳ Premium: {getattr(me, 'premium', 'Unknown')}")
+                                logger.error(f"   ↳ Group Call ID: {group_call_info['id']}")
+                                logger.error(f"   ↳ Group Call Access Hash: {group_call_info['access_hash']}")
+                                logger.error(f"   ↳ Channel Entity ID: {entity.id}")
+                                logger.error(f"   ↳ Channel Title: {getattr(entity, 'title', 'Unknown')}")
+                                logger.error(f"   ↳ EXACT ERROR: {group_call_error}")
+                                logger.error(f"   ↳ ERROR TYPE: {type(group_call_error).__name__}")
+                                
+                                # Try to get group call details from Telegram to see if it exists
+                                try:
+                                    from telethon.tl.functions.phone import GetGroupCallRequest
+                                    group_call_details = await client(GetGroupCallRequest(
+                                        call=group_call,
+                                        limit=1
+                                    ))
+                                    logger.error(f"   ↳ Group Call Exists: YES")
+                                    logger.error(f"   ↳ Group Call Participants: {len(group_call_details.participants)}")
+                                    logger.error(f"   ↳ Group Call Can Join: {group_call_details.call.join_muted}")
+                                except Exception as gc_check:
+                                    logger.error(f"   ↳ Group Call Check Failed: {gc_check}")
+                                    logger.error(f"   ↳ This suggests the group call may not be accessible to this account")
+                                
+                                # Check if account is restricted
+                                try:
+                                    full_user = await client.get_entity(me)
+                                    logger.error(f"   ↳ Account Restricted: {getattr(full_user, 'restricted', False)}")
+                                    if hasattr(full_user, 'restriction_reason'):
+                                        logger.error(f"   ↳ Restriction Reason: {full_user.restriction_reason}")
+                                except Exception as check_error:
+                                    logger.error(f"   ↳ Could not check account restrictions: {check_error}")
                                 
                                 # Still try alternative methods for completeness
                                 success = await self._try_alternative_join_methods(client, session_name, group_call, group_call_info, entity, me)
