@@ -975,16 +975,18 @@ class TelethonManager:
             return {"success": False, "message": f"Error: {e}", "accounts_joined": 0}
     
     async def _manage_group_call_speaking(self, client, session_name, group_call, group_call_info, entity):
-        """Manage speaking requests and random mute/unmute behavior for a group call"""
+        """Manage speaking requests and keep account active in group call permanently"""
         call_id = group_call_info['id']
-        max_speak_attempts = random.randint(4, 5)  # Random between 4-5 attempts
-        speak_attempts = 0
-        is_speaking = False
         
-        logger.info(f"🎙️ Starting speaking management for {session_name} in group call {call_id}")
+        logger.info(f"🎙️ Starting permanent speaking management for {session_name} in group call {call_id}")
         
         try:
-            while speak_attempts < max_speak_attempts and not is_speaking:
+            # First, try to get speaking permission a few times
+            max_speak_attempts = 3
+            speak_attempts = 0
+            got_speaking_permission = False
+            
+            while speak_attempts < max_speak_attempts and not got_speaking_permission:
                 # Wait random time before requesting to speak (30-120 seconds)
                 wait_time = random.randint(30, 120)
                 logger.info(f"⏰ Account {session_name} waiting {wait_time}s before speak request #{speak_attempts + 1}")
@@ -996,15 +998,19 @@ class TelethonManager:
                 
                 if speak_granted:
                     logger.info(f"✅ Account {session_name} granted speaking permission")
-                    is_speaking = True
-                    # Start random mute/unmute behavior
-                    await self._random_mute_unmute_behavior(client, session_name, group_call, call_id)
+                    got_speaking_permission = True
+                    # Start continuous behavior management
+                    await self._continuous_group_call_behavior(client, session_name, group_call, call_id)
+                    break
                 else:
                     logger.info(f"❌ Account {session_name} speak request #{speak_attempts} denied")
                     if speak_attempts < max_speak_attempts:
                         logger.info(f"🔄 Will try again... ({speak_attempts}/{max_speak_attempts})")
-                    else:
-                        logger.info(f"🛑 Account {session_name} stopping speak requests after {speak_attempts} attempts")
+            
+            # If never got speaking permission, still maintain presence as listener
+            if not got_speaking_permission:
+                logger.info(f"🎧 Account {session_name} maintaining listener presence in group call")
+                await self._maintain_listener_presence(client, session_name, group_call, call_id)
             
         except Exception as e:
             logger.error(f"Error in speaking management for {session_name}: {e}")
@@ -1093,6 +1099,92 @@ class TelethonManager:
                 
         except Exception as e:
             logger.error(f"Error in random mute/unmute behavior for {session_name}: {e}")
+
+    async def _continuous_group_call_behavior(self, client, session_name, group_call, call_id):
+        """Maintain continuous activity in group call with speaking permission"""
+        logger.info(f"🎭 Starting continuous behavior for {session_name} - will stay active indefinitely")
+        
+        try:
+            from telethon.tl.functions.phone import EditGroupCallParticipantRequest
+            me = await client.get_me()
+            is_muted = False
+            
+            # Stay active indefinitely with periodic mute/unmute
+            while True:
+                # Random wait between actions (30-180 seconds)
+                wait_time = random.randint(30, 180)
+                await asyncio.sleep(wait_time)
+                
+                try:
+                    # Randomly decide to mute or unmute (but not too frequently)
+                    should_mute = random.choice([True, False]) if random.random() < 0.3 else is_muted
+                    
+                    if should_mute != is_muted:
+                        await client(EditGroupCallParticipantRequest(
+                            call=group_call,
+                            participant=me,
+                            muted=should_mute
+                        ))
+                        
+                        action = "MUTED" if should_mute else "UNMUTED"
+                        logger.info(f"🎚️ Account {session_name} {action} (continuous behavior)")
+                        is_muted = should_mute
+                    else:
+                        # Send presence update even without state change
+                        await client(EditGroupCallParticipantRequest(
+                            call=group_call,
+                            participant=me,
+                            muted=is_muted
+                        ))
+                        logger.debug(f"🔄 Account {session_name} sent presence update")
+                        
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if "ended" in error_str or "not found" in error_str:
+                        logger.info(f"🔴 Group call {call_id} ended - stopping behavior for {session_name}")
+                        break
+                    else:
+                        logger.warning(f"⚠️ Behavior error for {session_name}: {e}")
+                        # Continue trying after short delay
+                        await asyncio.sleep(30)
+                        
+        except Exception as e:
+            logger.error(f"Error in continuous behavior for {session_name}: {e}")
+
+    async def _maintain_listener_presence(self, client, session_name, group_call, call_id):
+        """Maintain presence in group call as a listener (without speaking permission)"""
+        logger.info(f"🎧 Maintaining listener presence for {session_name} in group call {call_id}")
+        
+        try:
+            from telethon.tl.functions.phone import EditGroupCallParticipantRequest
+            me = await client.get_me()
+            
+            # Stay connected as listener indefinitely
+            while True:
+                # Send presence update every 2-5 minutes
+                wait_time = random.randint(120, 300)
+                await asyncio.sleep(wait_time)
+                
+                try:
+                    # Send muted presence update to maintain connection
+                    await client(EditGroupCallParticipantRequest(
+                        call=group_call,
+                        participant=me,
+                        muted=True  # Always muted as listener
+                    ))
+                    logger.debug(f"🎧 Account {session_name} maintained listener presence")
+                    
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if "ended" in error_str or "not found" in error_str:
+                        logger.info(f"🔴 Group call {call_id} ended - stopping listener for {session_name}")
+                        break
+                    else:
+                        logger.warning(f"⚠️ Listener presence error for {session_name}: {e}")
+                        await asyncio.sleep(60)
+                        
+        except Exception as e:
+            logger.error(f"Error maintaining listener presence for {session_name}: {e}")
 
     async def _maintain_group_call_connection(self, client, session_name, group_call, group_call_info):
         """Maintain group call connection and prevent automatic disconnection"""

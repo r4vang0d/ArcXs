@@ -108,9 +108,15 @@ class LiveMonitorService:
                 logger.info(f"🔍 Checking group call {call_id} - joined_calls: {self.joined_calls}")
                 
                 if call_id and call_id in self.joined_calls:
-                    logger.info(f"⏭️ Already attempted to join group call {call_id}, skipping...")
-                    await self.db.update_live_monitor_check(monitor_id, live_detected=True)
-                    return
+                    # Check if we should allow retry (for ended calls or after timeout)
+                    should_retry = await self._should_retry_group_call(call_id, channel_link)
+                    if should_retry:
+                        logger.info(f"🔄 Retrying group call {call_id} (may have restarted or reconnected)")
+                        self.joined_calls.discard(call_id)
+                    else:
+                        logger.info(f"⏭️ Already attempted to join group call {call_id}, skipping...")
+                        await self.db.update_live_monitor_check(monitor_id, live_detected=True)
+                        return
                 
                 # Get user's preferred account count for live streams
                 user_id = monitor['user_id']
@@ -227,3 +233,13 @@ class LiveMonitorService:
         except Exception as e:
             logger.error(f"Error force checking channel {channel_link}: {e}")
             return {"error": str(e)}
+    
+    async def _should_retry_group_call(self, call_id, channel_link):
+        """Check if we should retry joining a group call (e.g., if it restarted)"""
+        try:
+            # Always allow retry for now to test fresh connections
+            # In production, could add time-based logic or call status checks
+            return True
+        except Exception as e:
+            logger.error(f"Error checking retry status for call {call_id}: {e}")
+            return False

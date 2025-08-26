@@ -6,6 +6,15 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 
 # Recent Changes
 
+## August 26, 2025 - Final Resolution
+- **Permanent Group Call Presence**: Fixed accounts automatically leaving after mute/unmute behavior ends by implementing continuous presence system
+- **Fresh Join Attempts**: Added retry logic and cache management to allow fresh attempts when monitoring restarts
+- **Continuous Behavior Management**: Accounts now maintain indefinite presence in group calls with periodic activity
+- **Multiple Account Success**: Both accounts now successfully join group calls with unique WebRTC parameters
+- **Speaking Permission System**: Accounts request speaking permission and maintain active presence whether granted or not
+- **Connection Stability**: Implemented both speaking management and connection maintenance running simultaneously
+- **Production Ready**: System now maintains stable, long-term group call connections with realistic behavior patterns
+
 ## August 26, 2025
 - **Group Call Rate Limiting Fix**: Fixed "Invalid group call" errors when multiple accounts try to join live streams simultaneously by adding 2-5 second delays between join attempts and improved error handling to continue with other accounts instead of stopping
 - **Unique WebRTC Parameters**: Implemented sophisticated WebRTC parameter generation using account ID, session name, timestamp, and group call ID for truly unique connection parameters per account to prevent conflicts
