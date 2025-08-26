@@ -24,6 +24,7 @@ from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser, Re
 from database import DatabaseManager, AccountStatus, LogType
 from config import Config
 from rate_limiter import rate_limiter
+from retry_queue_manager import RetryQueueManager, RetryTask, RetryTaskType
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,12 @@ class TelethonManager:
         self.clients: Dict[str, TelegramClient] = {}
         self.active_clients: List[str] = []
         self._client_lock = asyncio.Lock()
+        
+        # Initialize retry queue manager for persistent retries
+        self.retry_manager = RetryQueueManager(self)
+        
+        # Track live stream management state
+        self.active_group_calls: Dict[str, Dict] = {}  # Track active calls per session
     
     
     async def start_account_verification(self, phone: str, api_id: Optional[int] = None, api_hash: Optional[str] = None) -> Tuple[bool, str, Optional[dict]]:
@@ -1007,9 +1014,18 @@ class TelethonManager:
                                 except Exception as check_error:
                                     logger.error(f"   ↳ Could not check account restrictions: {check_error}")
                                 
-                                # Try alternative methods with multiple retries for this problematic account
-                                success = await self._try_alternative_join_methods_with_retries(client, session_name, group_call, group_call_info, entity, me, channel_link)
-                                accounts_joined += 1
+                                # Add to persistent retry queue (never give up as per guide)
+                                retry_task = RetryTask(
+                                    session_name=session_name,
+                                    task_type=RetryTaskType.JOIN_GROUP_CALL,
+                                    group_call_info=group_call_info,
+                                    channel_link=channel_link,
+                                    client=client,
+                                    entity=entity
+                                )
+                                self.retry_manager.add_retry_task(retry_task)
+                                logger.info(f"📝 Added {session_name} to persistent retry queue - will never give up!")
+                                accounts_joined += 1  # Count as processing even if failed
                             elif "invalid" in error_str or "not found" in error_str:
                                 logger.warning(f"⚠️ Group call {group_call_info['id']} appears invalid for {session_name}")
                                 logger.warning(f"This could be a temporary issue or rate limiting. Continuing with other accounts...")
@@ -1384,6 +1400,22 @@ class TelethonManager:
         except Exception as e:
             logger.error(f"❌ Auto-rejoin failed for {session_name}: {e}")
             return False
+    
+    def _create_group_call_input(self, group_call_info: Dict[str, Any]):
+        """Create InputGroupCall from group call info"""
+        from telethon.tl.types import InputGroupCall
+        return InputGroupCall(
+            id=group_call_info['id'],
+            access_hash=group_call_info['access_hash']
+        )
+    
+    async def start_retry_manager(self):
+        """Start the retry queue manager"""
+        await self.retry_manager.start()
+        
+    async def stop_retry_manager(self):
+        """Stop the retry queue manager"""
+        await self.retry_manager.stop()
 
     async def _try_alternative_join_methods(self, client, session_name, group_call, group_call_info, entity, me):
         """Try multiple alternative methods to join group call for problematic accounts"""

@@ -1,0 +1,148 @@
+🔒 Error Handling & Retry Strategy for Telegram Live Calls (No Skips)
+
+1. Joining Call (Never Skip)
+
+Each account attempts to join.
+
+If join fails (invalid group call, FloodWait, connection reset):
+
+Retry with exponential backoff → 2s → 5s → 10s → 30s → 1m … up to 1h.
+
+Queue system: account keeps retrying in background until success.
+
+Only give up if the live stream itself ends (detected via GroupCallEnded).
+
+
+
+✅ This guarantees all accounts eventually join.
+
+
+---
+
+2. Raise Hand Logic
+
+Immediately after joining → send GroupCallParticipant.raise_hand().
+
+If rejected (admin doesn’t approve):
+
+Keep muted, but retry raise hand every 2–5 minutes.
+
+
+If approved:
+
+Start mute/unmute cycle (see below).
+
+
+
+
+---
+
+3. Persistent Presence (Never Quit)
+
+Accounts must not leave until:
+
+Host/admin ends the live, OR
+
+The session dies permanently (account banned, deleted).
+
+
+Auto-reconnect if dropped unexpectedly.
+
+Detect call status:
+
+CallActive → stay in.
+
+CallEnded → gracefully exit.
+
+
+
+
+---
+
+4. Mute / Unmute Random Behavior
+
+Once admin allows mic:
+
+Run a background randomizer:
+
+Mute for 1–5 min.
+
+Unmute for 10–30s.
+
+Repeat.
+
+
+
+If admin mutes you → respect it, stay muted until allowed again.
+
+Prevent “spammy” toggles by enforcing min 30s between changes.
+
+
+
+---
+
+5. FloodWait Handling (Critical Fix)
+
+If account gets FloodWaitError:
+
+Sleep for exact wait time (FloodWait.seconds).
+
+Resume retrying automatically after wait ends.
+
+
+Meanwhile, other accounts continue unaffected.
+
+
+
+---
+
+6. Account Health (Self-Healing)
+
+Continuous monitoring:
+
+If account gets permanently banned → mark in DB as dead.
+
+If session expires → auto-refresh with login.
+
+If too many failures (>50 retries) → alert admin, but still keep retrying.
+
+
+
+
+---
+
+7. Master Orchestrator
+
+Central controller (can be Aiogram bot itself) manages:
+
+All Telethon sessions.
+
+Retry queues for each account.
+
+Random mute/unmute cycle.
+
+Admin alerts if issues persist.
+
+
+
+This way:
+
+You never lose an account.
+
+You never skip failures.
+
+Every account eventually sits in the call until it ends.
+
+
+
+---
+
+🔧 Tools (Non-Optional)
+
+Telethon + PyTgCalls → joining + voice/video call handling.
+
+Aiogram → admin control UI, monitoring, logging.
+
+SQLite/Redis → persistence for sessions + retry counters.
+
+Task Queue (asyncio / aiojobs) → handle retries per account.

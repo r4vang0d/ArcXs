@@ -301,6 +301,10 @@ class ViewBoosterBot:
             # Load existing Telethon sessions
             await self.telethon_manager.load_existing_sessions()
             
+            # Start the advanced retry queue manager for persistent retries
+            await self.telethon_manager.start_retry_manager()
+            logger.info("🔄 Advanced retry queue manager started - never gives up on failed joins!")
+            
             # Start live monitoring service only if there are monitors configured
             # This prevents auto-start spam when no channels are being monitored
             # await self.live_monitor.start_monitoring()
@@ -321,6 +325,10 @@ class ViewBoosterBot:
         logger.info("Shutting down bot...")
         
         try:
+            # Stop retry manager first
+            await self.telethon_manager.stop_retry_manager()
+            logger.info("⏹️ Retry queue manager stopped")
+            
             # Stop live monitoring service
             await self.live_monitor.stop_monitoring()
             await self.telethon_manager.cleanup()
