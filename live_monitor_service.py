@@ -4,7 +4,7 @@ Continuously monitors channels for live streams and auto-joins with all accounts
 """
 import asyncio
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from database import DatabaseManager, LogType
 from session_manager import TelethonManager
