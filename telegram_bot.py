@@ -36,12 +36,12 @@ class ViewBoosterBot:
         # Initialize Telethon manager
         self.telethon_manager = TelethonManager(config, db_manager)
         
-        # Initialize handlers
-        self.admin_handler = AdminHandler(config, db_manager, self.telethon_manager)
-        self.user_handler = UserHandler(config, db_manager, self.telethon_manager)
-        
         # Initialize live monitoring service
         self.live_monitor = LiveMonitorService(db_manager, self.telethon_manager)
+        
+        # Initialize handlers with live monitor service
+        self.admin_handler = AdminHandler(config, db_manager, self.telethon_manager)
+        self.user_handler = UserHandler(config, db_manager, self.telethon_manager, self.live_monitor)
         
         # Pass bot instance to handlers
         self.admin_handler.bot = self.bot

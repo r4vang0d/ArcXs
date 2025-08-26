@@ -31,10 +31,11 @@ class UserStates(StatesGroup):
 class UserHandler:
     """Handles user-specific operations"""
     
-    def __init__(self, config: Config, db_manager: DatabaseManager, telethon_manager: TelethonManager):
+    def __init__(self, config: Config, db_manager: DatabaseManager, telethon_manager: TelethonManager, live_monitor=None):
         self.config = config
         self.db = db_manager
         self.telethon = telethon_manager
+        self.live_monitor = live_monitor
         self.bot: Optional[Bot] = None  # Will be set by the main bot class
     
     async def handle_callback(self, callback_query: types.CallbackQuery, state: FSMContext):
@@ -1553,16 +1554,30 @@ Use the buttons below to manage this channel."""
         """Start live monitoring service"""
         await callback_query.answer()
         
-        text = """🔴 **Live Monitoring Started**
+        try:
+            if self.live_monitor:
+                await self.live_monitor.start_monitoring()
+                
+                text = """🔴 **Live Monitoring Started**
 
-✅ The live monitoring service is now actively scanning all your monitored channels for live streams every 30 seconds.
+✅ The live monitoring service is now actively scanning all your monitored channels for live streams every 15 seconds.
 
 📊 **Status:**
-• Service: Active
-• Scan Interval: 30 seconds
+• Service: Active ✅
+• Scan Interval: 15 seconds
 • Auto-join: Enabled
 
 When a live stream is detected, all your accounts will automatically join the stream."""
+            else:
+                text = """❌ **Monitoring Service Unavailable**
+
+The live monitoring service is temporarily unavailable. Please try again later."""
+                
+        except Exception as e:
+            logger.error(f"Error starting live monitoring: {e}")
+            text = """❌ **Failed to Start Monitoring**
+
+There was an error starting the live monitoring service. Please try again."""
 
         await self.safe_edit_message(
             callback_query,
@@ -1574,15 +1589,29 @@ When a live stream is detected, all your accounts will automatically join the st
         """Stop live monitoring service"""
         await callback_query.answer()
         
-        text = """⏹️ **Live Monitoring Stopped**
+        try:
+            if self.live_monitor:
+                await self.live_monitor.stop_monitoring()
+                
+                text = """⏹️ **Live Monitoring Stopped**
 
-🔴 The live monitoring service has been paused. No automatic scanning for live streams will occur.
+🔴 The live monitoring service has been stopped. No automatic scanning for live streams will occur.
 
 📊 **Status:**
-• Service: Inactive
+• Service: Inactive ❌
 • Auto-join: Disabled
 
 You can restart monitoring anytime by clicking "Start Monitoring"."""
+            else:
+                text = """❌ **Monitoring Service Unavailable**
+
+The live monitoring service is temporarily unavailable."""
+                
+        except Exception as e:
+            logger.error(f"Error stopping live monitoring: {e}")
+            text = """❌ **Failed to Stop Monitoring**
+
+There was an error stopping the live monitoring service."""
 
         await self.safe_edit_message(
             callback_query,
