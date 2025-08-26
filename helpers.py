@@ -35,7 +35,8 @@ class Utils:
         """Validate Telegram channel/group link"""
         patterns = [
             r'^https://t\.me/[a-zA-Z0-9_]{5,}$',  # Public channels
-            r'^https://t\.me/joinchat/[a-zA-Z0-9_-]+$',  # Private invite links
+            r'^https://t\.me/joinchat/[a-zA-Z0-9_-]+$',  # Old private invite links
+            r'^https://t\.me/\+[a-zA-Z0-9_-]+$',  # New private invite links with +
             r'^@[a-zA-Z0-9_]{5,}$',  # Username format
             r'^[a-zA-Z0-9_]{5,}$',  # Just username without @
         ]
