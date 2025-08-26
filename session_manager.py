@@ -795,16 +795,22 @@ class TelethonManager:
             logger.error(f"Error getting channel info for {channel_link}: {e}")
             return None
     
-    async def join_live_stream(self, channel_link: str, group_call_info: Optional[Dict] = None) -> Dict[str, Any]:
-        """Join live stream with all available accounts"""
+    async def join_live_stream(self, channel_link: str, group_call_info: Optional[Dict] = None, max_accounts: Optional[int] = None) -> Dict[str, Any]:
+        """Join live stream with specified number of accounts (or all if not specified)"""
         if not self.active_clients:
             return {"success": False, "message": "No active accounts", "accounts_joined": 0}
         
         accounts_joined = 0
         failed_accounts = []
         
+        # Determine which accounts to use
+        accounts_to_use = self.active_clients
+        if max_accounts and max_accounts > 0:
+            accounts_to_use = self.active_clients[:max_accounts]
+            logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
+        
         try:
-            for session_name in self.active_clients:
+            for session_name in accounts_to_use:
                 try:
                     client = self.clients[session_name]
                     entity = await client.get_entity(channel_link)

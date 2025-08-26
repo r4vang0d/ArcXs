@@ -92,7 +92,8 @@ class Utils:
                     "account_rotation": True,  # Always enabled
                     "delay_level": "medium",
                     "auto_join": True,
-                    "auto_message_count": 10  # Default: boost last 10 messages
+                    "auto_message_count": 10,  # Default: boost last 10 messages
+                    "live_account_count": None  # Default: use all accounts for live streams
                 }
             settings = json.loads(settings_json)
             # Force account rotation to always be True
@@ -105,7 +106,8 @@ class Utils:
                 "account_rotation": True,  # Always enabled
                 "delay_level": "medium",
                 "auto_join": True,
-                "auto_message_count": 10  # Default: boost last 10 messages
+                "auto_message_count": 10,  # Default: boost last 10 messages
+                "live_account_count": None  # Default: use all accounts for live streams
             }
     
     @staticmethod

@@ -103,8 +103,12 @@ class LiveMonitorService:
                     await self.db.update_live_monitor_check(monitor_id, live_detected=True)
                     return
                 
-                # Join the live stream with all accounts
-                result = await self.telethon.join_live_stream(channel_link, group_call_info)
+                # Get user's preferred account count for live streams
+                user_id = monitor['user_id']
+                user_account_preference = await self._get_user_live_account_count(user_id)
+                
+                # Join the live stream with specified or all accounts
+                result = await self.telethon.join_live_stream(channel_link, group_call_info, user_account_preference)
                 
                 # Only mark as attempted if we actually succeeded or if it's permanently invalid
                 if call_id and (result['success'] or "invalid" in result.get('message', '').lower()):
@@ -145,6 +149,36 @@ class LiveMonitorService:
                 
         except Exception as e:
             logger.error(f"Error checking monitor for {monitor.get('channel_link')}: {e}")
+    
+    async def _get_user_live_account_count(self, user_id: int) -> Optional[int]:
+        """Get user's preferred account count for live streams"""
+        try:
+            user = await self.db.get_user(user_id)
+            if not user:
+                return None
+            
+            # Parse user settings
+            settings_json = user.get("settings", "{}")
+            try:
+                import json
+                settings = json.loads(settings_json) if settings_json else {}
+                live_account_count = settings.get("live_account_count")
+                
+                # Return None if not set (use all accounts) or if it's a valid number
+                if live_account_count is None:
+                    return None
+                elif isinstance(live_account_count, int) and live_account_count > 0:
+                    return live_account_count
+                else:
+                    return None
+                    
+            except json.JSONDecodeError:
+                logger.error(f"Invalid settings JSON for user {user_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting user live account count for {user_id}: {e}")
+            return None
     
     async def get_status(self) -> Dict[str, Any]:
         """Get current monitoring status"""

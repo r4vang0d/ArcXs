@@ -29,6 +29,7 @@ class UserStates(StatesGroup):
     waiting_for_poll_choice = State()
     waiting_for_custom_view_count = State()
     waiting_for_manual_message_ids = State()
+    waiting_for_live_account_count = State()
 
 class UserHandler:
     """Handles user-specific operations"""
@@ -78,6 +79,10 @@ class UserHandler:
             await self.show_live_monitor_status(callback_query)
         elif data.startswith("live_channel_info:"):
             await self.show_live_channel_info(callback_query, data)
+        elif data == "configure_live_accounts":
+            await self.show_live_account_selection(callback_query)
+        elif data.startswith("live_account_count:"):
+            await self.handle_live_account_selection(callback_query, data, state)
         elif data.startswith("remove_live_channel:"):
             await self.confirm_remove_live_channel(callback_query, data)
         elif data == "start_live_monitor":
@@ -147,6 +152,8 @@ class UserHandler:
                 await self.process_custom_view_count(message, state)
             elif current_state == UserStates.waiting_for_manual_message_ids.state:
                 await self.process_manual_message_ids(message, state)
+            elif current_state == UserStates.waiting_for_live_account_count.state:
+                await self.process_live_account_count(message, state)
             else:
                 logger.info(f"No handler for state: {current_state}")
         except Exception as e:
@@ -1617,18 +1624,23 @@ Last Boosted: {last_boosted}
                 active_count = 0
                 total_count = 0
             
+            # Get current account setting
+            current_setting = await self.get_user_setting(callback_query.from_user.id, "live_account_count")
+            account_text = f"{current_setting} accounts" if current_setting else "all accounts"
+            
             text = f"""🔴 **Live Stream Management**
 
 📊 **Status Overview:**
 • Total Monitored: {total_count} channels
 • Active Monitoring: {active_count} channels
+• Account Usage: {account_text} per live stream
 
 ⚡ **How it works:**
-The bot continuously monitors your selected channels for live streams and automatically joins them with all available accounts when detected.
+The bot continuously monitors your selected channels for live streams and automatically joins them with your configured number of accounts when detected.
 
 🎯 **Features:**
 • Add multiple channels to monitor
-• Auto-join live streams with all accounts
+• Configure how many accounts to use
 • Real-time monitoring status
 • Professional live stream detection"""
 
@@ -1728,6 +1740,165 @@ Type `/cancel` to cancel."""
             await processing_msg.edit_text("❌ Error processing channel. Please try again.")
         
         await state.clear()
+    
+    async def process_live_account_count(self, message: types.Message, state: FSMContext):
+        """Process live account count selection"""
+        if not message.from_user or not message.text:
+            return
+        
+        user_input = message.text.strip()
+        
+        if user_input == "/cancel":
+            await state.clear()
+            await message.answer("❌ Operation cancelled", 
+                               reply_markup=BotKeyboards.main_menu(True))
+            return
+        
+        try:
+            account_count = int(user_input)
+            if account_count < 1:
+                await message.answer("❌ Please enter a number greater than 0.")
+                return
+                
+            # Get available accounts
+            available_accounts = len(self.telethon.active_clients)
+            if account_count > available_accounts:
+                await message.answer(f"❌ You only have {available_accounts} active accounts. Please enter a smaller number.")
+                return
+            
+            # Store the selected account count in user settings
+            await self.update_user_setting(message.from_user.id, "live_account_count", account_count)
+            
+            await message.answer(
+                f"✅ **Account Selection Confirmed**\n\n"
+                f"🤖 **Selected:** {account_count} account(s)\n"
+                f"📊 **Available:** {available_accounts} total accounts\n\n"
+                f"The live monitoring will now use {account_count} account(s) to join live streams when detected.\n\n"
+                f"**Note:** This setting will apply to all your monitored channels until changed.",
+                reply_markup=BotKeyboards.live_management()
+            )
+            
+        except ValueError:
+            await message.answer("❌ Please enter a valid number.")
+            return
+        
+        await state.clear()
+    
+    async def show_live_account_selection(self, callback_query: types.CallbackQuery):
+        """Show live account selection menu"""
+        try:
+            await callback_query.answer()
+            
+            # Get available accounts count
+            available_accounts = len(self.telethon.active_clients)
+            
+            if available_accounts == 0:
+                text = """🤖 **Account Configuration**
+                
+❌ **No Active Accounts**
+
+You don't have any active accounts set up. Please add accounts first before configuring live stream joining.
+
+💡 **Tip:** Go to 'Manage Accounts' to add your Telegram accounts."""
+                
+                await self.safe_edit_message(
+                    callback_query,
+                    text,
+                    reply_markup=BotKeyboards.live_management()
+                )
+                return
+            
+            # Get current setting
+            current_setting = await self.get_user_setting(callback_query.from_user.id, "live_account_count")
+            current_text = f"{current_setting} account(s)" if current_setting else "All accounts (default)"
+            
+            text = f"""🤖 **Live Stream Account Configuration**
+
+📊 **Available Accounts:** {available_accounts}
+
+Choose how many accounts you want to use for joining live streams:
+
+⚡ **Current Setting:** {current_text}
+📝 **Note:** This will apply to all monitored channels
+
+Select the number of accounts below:"""
+
+            await self.safe_edit_message(
+                callback_query,
+                text,
+                reply_markup=BotKeyboards.live_account_selection(available_accounts)
+            )
+            
+        except Exception as e:
+            logger.error(f"Error showing live account selection: {e}")
+            await callback_query.answer("❌ Error loading account selection. Please try again.", show_alert=True)
+    
+    async def handle_live_account_selection(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
+        """Handle live account count selection"""
+        try:
+            await callback_query.answer()
+            
+            # Extract count from callback data
+            count_str = data.split(":")[1]
+            
+            if count_str == "custom":
+                # Set state for custom input
+                await state.set_state(UserStates.waiting_for_live_account_count)
+                
+                available_accounts = len(self.telethon.active_clients)
+                text = f"""✏️ **Custom Account Count**
+
+📊 **Available:** {available_accounts} accounts
+
+Please enter the number of accounts you want to use for live streams:
+
+**Example:** Type `3` to use 3 accounts
+
+Type `/cancel` to cancel."""
+                
+                await self.safe_edit_message(
+                    callback_query,
+                    text,
+                    reply_markup=BotKeyboards.cancel_operation()
+                )
+                return
+            
+            # Handle predefined count selection
+            try:
+                account_count = int(count_str)
+                available_accounts = len(self.telethon.active_clients)
+                
+                if account_count > available_accounts:
+                    await callback_query.answer("❌ Not enough active accounts", show_alert=True)
+                    return
+                
+                # Store the setting in user database
+                await self.update_user_setting(callback_query.from_user.id, "live_account_count", account_count)
+                
+                text = f"""✅ **Account Configuration Updated**
+
+🤖 **Selected:** {account_count} account(s)
+📊 **Available:** {available_accounts} total accounts
+
+**Live Stream Joining:**
+• {account_count} account(s) will join when live streams are detected
+• This applies to all your monitored channels
+• You can change this anytime
+
+The setting has been saved successfully!"""
+                
+                await self.safe_edit_message(
+                    callback_query,
+                    text,
+                    reply_markup=BotKeyboards.live_management()
+                )
+                
+            except ValueError:
+                await callback_query.answer("❌ Invalid account count", show_alert=True)
+                
+        except Exception as e:
+            logger.error(f"Error handling live account selection: {e}")
+            await callback_query.answer("❌ Error processing selection. Please try again.", show_alert=True)
     
     async def show_live_channels(self, callback_query: types.CallbackQuery):
         """Show list of monitored live channels"""

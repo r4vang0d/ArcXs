@@ -210,7 +210,7 @@ class BotKeyboards:
         buttons = [
             [InlineKeyboardButton(text="➕ Add Monitor Channel", callback_data="add_live_channel"),
              InlineKeyboardButton(text="📋 View Monitored", callback_data="view_live_channels")],
-            [InlineKeyboardButton(text="🗑️ Remove Channel", callback_data="remove_live_channel"),
+            [InlineKeyboardButton(text="🤖 Account Count", callback_data="configure_live_accounts"),
              InlineKeyboardButton(text="⚡ Monitor Status", callback_data="live_monitor_status")],
             [InlineKeyboardButton(text="🔴 Start Monitoring", callback_data="start_live_monitor"),
              InlineKeyboardButton(text="⏹️ Stop Monitoring", callback_data="stop_live_monitor")],
@@ -248,6 +248,61 @@ class BotKeyboards:
         buttons.append([
             InlineKeyboardButton(text="🏠 Main Menu", callback_data="main_menu")
         ])
+        return InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    @staticmethod
+    def live_account_selection(available_accounts: int) -> InlineKeyboardMarkup:
+        """Generate keyboard for selecting number of accounts for live management"""
+        buttons = []
+        
+        # Provide options based on available accounts
+        if available_accounts >= 1:
+            buttons.append([
+                InlineKeyboardButton(text="1️⃣ 1 Account", callback_data="live_account_count:1")
+            ])
+        
+        if available_accounts >= 2:
+            buttons.append([
+                InlineKeyboardButton(text="2️⃣ 2 Accounts", callback_data="live_account_count:2"),
+                InlineKeyboardButton(text="3️⃣ 3 Accounts", callback_data="live_account_count:3") if available_accounts >= 3 else None
+            ])
+            # Remove None values
+            buttons[-1] = [btn for btn in buttons[-1] if btn is not None]
+        
+        if available_accounts >= 5:
+            buttons.append([
+                InlineKeyboardButton(text="5️⃣ 5 Accounts", callback_data="live_account_count:5"),
+                InlineKeyboardButton(text="🔟 10 Accounts", callback_data="live_account_count:10") if available_accounts >= 10 else None
+            ])
+            # Remove None values
+            buttons[-1] = [btn for btn in buttons[-1] if btn is not None]
+        
+        if available_accounts >= 20:
+            buttons.append([
+                InlineKeyboardButton(text="2️⃣0️⃣ 20 Accounts", callback_data="live_account_count:20"),
+                InlineKeyboardButton(text="5️⃣0️⃣ 50 Accounts", callback_data="live_account_count:50") if available_accounts >= 50 else None
+            ])
+            # Remove None values
+            buttons[-1] = [btn for btn in buttons[-1] if btn is not None]
+        
+        if available_accounts >= 100:
+            buttons.append([
+                InlineKeyboardButton(text="💯 All Accounts", callback_data=f"live_account_count:{available_accounts}")
+            ])
+        elif available_accounts > 50:
+            buttons.append([
+                InlineKeyboardButton(text="💎 All Accounts", callback_data=f"live_account_count:{available_accounts}")
+            ])
+        
+        # Add custom option
+        buttons.append([
+            InlineKeyboardButton(text="✏️ Custom Amount", callback_data="live_account_count:custom")
+        ])
+        
+        buttons.append([
+            InlineKeyboardButton(text="🔙 Back", callback_data="live_management")
+        ])
+        
         return InlineKeyboardMarkup(inline_keyboard=buttons)
     
     @staticmethod

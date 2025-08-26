@@ -7,6 +7,11 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 # Recent Changes
 
 ## August 26, 2025
+- **Live Account Selection Feature**: Added user-configurable account count for live stream joining instead of automatically using all accounts
+- **Account Configuration Menu**: New "Account Count" button in live management allows users to select how many accounts to use (1, 2, 3, 5, 10, 20, 50, all, or custom amount)
+- **User Preference Storage**: Live account count setting is stored in user settings database and persists across sessions
+- **Smart Live Monitoring**: Live monitor service now respects user's account preference when joining live streams
+- **Enhanced Live Management UI**: Live management menu now displays current account usage setting and improved feature descriptions
 - **2FA Authentication Support**: Completely redesigned 2FA handling to support two-factor authentication instead of asking users to disable it
 - **Private Invite Link Fix**: Added support for new Telegram private invite link format (https://t.me/+xxxxx) alongside existing formats
 - **Connection Management Improvements**: Fixed "Cannot send requests while disconnected" errors by improving Telethon client connection handling
