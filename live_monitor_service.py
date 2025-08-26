@@ -106,25 +106,39 @@ class LiveMonitorService:
                 # Join the live stream with all accounts
                 result = await self.telethon.join_live_stream(channel_link, group_call_info)
                 
-                # Mark this group call as attempted (success or fail)
-                if call_id:
+                # Only mark as attempted if we actually succeeded or if it's permanently invalid
+                if call_id and (result['success'] or "invalid" in result.get('message', '').lower()):
                     self.joined_calls.add(call_id)
+                    if result['success']:
+                        logger.info(f"✅ Marked group call {call_id} as successfully joined")
+                    else:
+                        logger.info(f"❌ Marked group call {call_id} as invalid - won't retry")
                 
                 if result['success']:
                     accounts_joined = result['accounts_joined']
-                    logger.info(f"✅ Successfully joined live stream with {accounts_joined} accounts")
+                    group_call_joined = result.get('group_call_joined', False)
+                    
+                    if group_call_joined:
+                        logger.info(f"🎤 Successfully joined GROUP CALL with {accounts_joined} accounts - speaking management started!")
+                    else:
+                        logger.info(f"📺 Successfully joined CHANNEL with {accounts_joined} accounts (no group call access)")
                     
                     # Update database with successful live detection
                     await self.db.update_live_monitor_check(monitor_id, live_detected=True)
                     
                     # Log the successful live join
+                    join_type = "group call" if group_call_joined else "channel"
                     await self.db.log_action(
                         LogType.LIVE_JOIN,
                         user_id=monitor['user_id'],
-                        message=f"Auto-joined live stream in {channel_link} with {accounts_joined} accounts"
+                        message=f"Auto-joined live stream {join_type} in {channel_link} with {accounts_joined} accounts"
                     )
                 else:
-                    logger.error(f"❌ Failed to join live stream: {result['message']}")
+                    error_msg = result['message']
+                    if "invalid" in error_msg.lower():
+                        logger.warning(f"⚠️ Group call expired/invalid: {error_msg}")
+                    else:
+                        logger.error(f"❌ Failed to join live stream: {error_msg}")
             else:
                 # Update last checked time (no live detected)
                 await self.db.update_live_monitor_check(monitor_id, live_detected=False)

@@ -835,12 +835,14 @@ class TelethonManager:
                             
                             me = await client.get_me()
                             
-                            # Simplified WebRTC parameters for testing
-                            ssrc = random.randint(1000000, 9999999)
+                            # More realistic WebRTC parameters
+                            ssrc = random.randint(1000000000, 9999999999)
                             webrtc_params = {
-                                "ufrag": f"tg{random.randint(100000, 999999)}",
-                                "pwd": f"pwd{random.randint(100000000, 999999999)}",
-                                "ssrc": ssrc
+                                "ufrag": f"tg{random.randint(1000000, 9999999)}",
+                                "pwd": f"tg{random.randint(1000000000, 9999999999)}",
+                                "ssrc": ssrc,
+                                "ssrc-audio": ssrc,
+                                "ssrc-video": ssrc + 1
                             }
                             params = DataJSON(data=json.dumps(webrtc_params))
                             
@@ -848,33 +850,58 @@ class TelethonManager:
                             
                             logger.info(f"Attempting to join group call {group_call_info['id']} with account {session_name}")
                             
-                            # Try different join approaches
+                            # Try different join approaches with better error handling
+                            join_success = False
                             try:
-                                # First try: Join as user
+                                # First try: Join as user (most common)
                                 await client(JoinGroupCallRequest(
                                     call=group_call,
-                                    join_as=me,     # Join as the user account
-                                    muted=True,      # Join muted to avoid audio issues
-                                    video_stopped=True,  # Join without video
-                                    params=params   # Required WebRTC parameters
+                                    join_as=me,
+                                    muted=True,
+                                    video_stopped=True,
+                                    params=params
                                 ))
-                                logger.info(f"Successfully joined as user")
+                                logger.info(f"✅ Account {session_name} successfully joined as user")
+                                join_success = True
                             except Exception as user_join_error:
-                                logger.warning(f"Failed to join as user: {user_join_error}")
+                                error_str = str(user_join_error).lower()
+                                if "invalid" in error_str or "not found" in error_str:
+                                    logger.warning(f"❌ Group call {group_call_info['id']} is invalid or expired")
+                                    raise Exception(f"Invalid group call: {user_join_error}")
+                                
+                                logger.warning(f"⚠️ Failed to join as user: {user_join_error}")
                                 # Second try: Join as entity/channel
                                 try:
                                     await client(JoinGroupCallRequest(
                                         call=group_call,
-                                        join_as=entity,  # Join as the channel entity
-                                        muted=True,      
-                                        video_stopped=True,  
-                                        params=params   
+                                        join_as=entity,
+                                        muted=True,
+                                        video_stopped=True,
+                                        params=params
                                     ))
-                                    logger.info(f"Successfully joined as entity")
+                                    logger.info(f"✅ Account {session_name} successfully joined as entity")
+                                    join_success = True
                                 except Exception as entity_join_error:
-                                    # Third approach: Just ensure we're a participant and listening
-                                    logger.warning(f"Failed to join as entity: {entity_join_error}")
-                                    raise Exception(f"Cannot join group call: User join failed ({user_join_error}), Entity join failed ({entity_join_error})")
+                                    logger.warning(f"❌ Failed to join as entity: {entity_join_error}")
+                                    # Try simplified join without video params
+                                    try:
+                                        simple_params = DataJSON(data=json.dumps({
+                                            "ufrag": webrtc_params["ufrag"],
+                                            "pwd": webrtc_params["pwd"]
+                                        }))
+                                        await client(JoinGroupCallRequest(
+                                            call=group_call,
+                                            join_as=me,
+                                            muted=True,
+                                            params=simple_params
+                                        ))
+                                        logger.info(f"✅ Account {session_name} joined with simplified params")
+                                        join_success = True
+                                    except Exception as simple_join_error:
+                                        raise Exception(f"All join methods failed: User({user_join_error}), Entity({entity_join_error}), Simple({simple_join_error})")
+                            
+                            if not join_success:
+                                raise Exception("Failed to join group call")
                             accounts_joined += 1
                             logger.info(f"🎤 Account {session_name} joined GROUP CALL in {channel_link}")
                             
@@ -884,21 +911,29 @@ class TelethonManager:
                             ))
                         
                         except Exception as group_call_error:
-                            if "already in groupcall" in str(group_call_error).lower():
+                            error_str = str(group_call_error).lower()
+                            if "already in groupcall" in error_str or "already a participant" in error_str:
                                 accounts_joined += 1  # Already in call, count as success
-                                logger.info(f"Account {session_name} already in group call")
-                            elif "admin privileges" in str(group_call_error).lower():
-                                # Permission issue - bot needs admin rights or the channel restricts group call joining
-                                logger.warning(f"Account {session_name} lacks admin privileges to join group call in {channel_link}")
-                                logger.info(f"💡 Solution: Make the account an admin or use a channel that allows group call joining")
+                                logger.info(f"✅ Account {session_name} already in group call")
+                                # Still start speaking management for already joined accounts
+                                asyncio.create_task(self._manage_group_call_speaking(
+                                    client, session_name, group_call, group_call_info, entity
+                                ))
+                            elif "admin privileges" in error_str or "forbidden" in error_str:
+                                logger.warning(f"⚠️ Account {session_name} lacks permission to join group call")
+                                accounts_joined += 1  # Count as channel join success
+                                logger.info(f"📺 Account {session_name} joined channel but cannot join group call (permission denied)")
+                            elif "invalid" in error_str or "not found" in error_str:
+                                logger.error(f"❌ Group call {group_call_info['id']} is invalid or expired")
+                                # Don't count invalid calls as success
+                                failed_accounts.append(session_name)
+                                # Invalid call - return early to avoid repeated attempts
+                                raise Exception(f"Invalid group call - stopping attempts")
+                            else:
+                                logger.error(f"❌ Failed to join group call with {session_name}: {group_call_error}")
                                 # Still count as joined to channel
                                 accounts_joined += 1
-                                logger.info(f"Account {session_name} joined channel but cannot join group call (permission denied)")
-                            else:
-                                logger.error(f"Failed to join group call with {session_name}: {group_call_error}")
-                                # Still count as joined to channel even if group call fails
-                                accounts_joined += 1
-                                logger.info(f"Account {session_name} joined channel but not group call")
+                                logger.info(f"📺 Account {session_name} joined channel but not group call")
                     else:
                         # No group call info, just joined channel
                         accounts_joined += 1
@@ -916,11 +951,20 @@ class TelethonManager:
             if failed_accounts:
                 message += f". Failed with {len(failed_accounts)} accounts"
             
+            # Only return success if we actually joined some group calls
+            group_call_success = accounts_joined > 0 and not group_call_info
+            if group_call_info:
+                # Check if any accounts actually joined the group call (not just channel)
+                group_call_success = any("Successfully joined" in message for message in [
+                    f"Account joined group call successfully" for _ in range(accounts_joined - len(failed_accounts))
+                ])
+            
             return {
                 "success": success,
                 "message": message,
                 "accounts_joined": accounts_joined,
-                "failed_accounts": failed_accounts
+                "failed_accounts": failed_accounts,
+                "group_call_joined": group_call_success
             }
             
         except Exception as e:
