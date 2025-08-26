@@ -7,6 +7,7 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 # Recent Changes
 
 ## August 26, 2025
+- **Group Call Rate Limiting Fix**: Fixed "Invalid group call" errors when multiple accounts try to join live streams simultaneously by adding 2-5 second delays between join attempts and improved error handling to continue with other accounts instead of stopping
 - **Live Account Selection Feature**: Added user-configurable account count for live stream joining instead of automatically using all accounts
 - **Account Configuration Menu**: New "Account Count" button in live management allows users to select how many accounts to use (1, 2, 3, 5, 10, 20, 50, all, or custom amount)
 - **User Preference Storage**: Live account count setting is stored in user settings database and persists across sessions

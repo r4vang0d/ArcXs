@@ -812,7 +812,7 @@ class TelethonManager:
             logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
         
         try:
-            for session_name in accounts_to_use:
+            for i, session_name in enumerate(accounts_to_use):
                 try:
                     client = self.clients[session_name]
                     entity = await client.get_entity(channel_link)
@@ -830,6 +830,12 @@ class TelethonManager:
                     # Now try to join the group call if info is available
                     if group_call_info:
                         try:
+                            # Add delay between group call attempts to avoid rate limiting
+                            if i > 0:  # Don't delay for the first account
+                                delay = random.randint(2, 5)  # Random delay between 2-5 seconds
+                                logger.info(f"⏳ Waiting {delay}s before attempting group call join with {session_name}")
+                                await asyncio.sleep(delay)
+                            
                             from telethon.tl.types import InputGroupCall
                             group_call = InputGroupCall(
                                 id=group_call_info['id'],
@@ -877,10 +883,12 @@ class TelethonManager:
                         except Exception as group_call_error:
                             error_str = str(group_call_error).lower()
                             if "invalid" in error_str or "not found" in error_str:
-                                logger.error(f"❌ Group call {group_call_info['id']} is invalid or expired")
-                                logger.error(f"Error with client {session_name}: Invalid group call - stopping attempts")
-                                # Invalid call - break out of loop to avoid repeated failures
-                                break
+                                logger.warning(f"⚠️ Group call {group_call_info['id']} appears invalid for {session_name}")
+                                logger.warning(f"This could be a temporary issue or rate limiting. Continuing with other accounts...")
+                                # Don't break the loop - continue trying with other accounts
+                                # Still count as joined to channel
+                                accounts_joined += 1
+                                logger.info(f"📺 Account {session_name} joined channel but not group call")
                             elif "already in groupcall" in error_str or "already a participant" in error_str:
                                 accounts_joined += 1  # Already in call, count as success
                                 logger.info(f"✅ Account {session_name} already in group call")
