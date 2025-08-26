@@ -735,11 +735,17 @@ Select your preferred mode:
                     await callback_query.answer("❌ Could not find recent messages in the channel.", show_alert=True)
                     return
                 
+                # Answer the callback query first to prevent UI issues
+                await callback_query.answer()
+                
                 # Proceed with boost or reactions based on feature type
                 if feature_type == "reactions":
                     await self.execute_reactions_with_settings(callback_query, state, message_ids, view_count, time_minutes)
                 else:
                     await self.execute_boost_with_settings(callback_query, state, message_ids, view_count, time_minutes)
+                
+                # Ensure we return here to prevent further execution
+                return
                 
             else:
                 # Manual mode - ask for message IDs
@@ -2398,30 +2404,57 @@ Select how quickly you want the views to be delivered.
 {'📖 Views + Read' if mark_as_read else '👁️ Views Only'}
 
 {boost_message}
+
+🏠 Click 'Main Menu' to continue with other operations.
                 """
             else:
-                final_text = f"❌ **Boost Failed**\n\n{boost_message}"
+                final_text = f"❌ **Boost Failed**\n\n{boost_message}\n\n🏠 Click 'Main Menu' to try again."
             
-            if hasattr(processing_msg, 'edit_text'):
-                await processing_msg.edit_text(
-                    final_text,
-                    reply_markup=BotKeyboards.main_menu(True),
-                    parse_mode="Markdown"
-                )
-            else:
-                try:
-                    if hasattr(processing_msg, 'delete'):
-                        await processing_msg.delete()
-                except Exception:
-                    pass  # Ignore deletion errors
-                if hasattr(message_obj, 'answer'):
-                    await message_obj.answer(
+            # Clear state before updating the message to prevent any state conflicts
+            await state.clear()
+            
+            # Update the message with final results
+            try:
+                if hasattr(processing_msg, 'edit_text'):
+                    await processing_msg.edit_text(
                         final_text,
                         reply_markup=BotKeyboards.main_menu(True),
                         parse_mode="Markdown"
                     )
-            
-            await state.clear()
+                else:
+                    # If we can't edit the processing message, delete it and send a new one
+                    try:
+                        if hasattr(processing_msg, 'delete'):
+                            await processing_msg.delete()
+                    except Exception:
+                        pass  # Ignore deletion errors
+                    
+                    # Send new message with results
+                    if hasattr(message_obj, 'message') and hasattr(message_obj.message, 'answer'):
+                        await message_obj.message.answer(
+                            final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+                    elif hasattr(message_obj, 'answer'):
+                        await message_obj.answer(
+                            final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+            except Exception as msg_error:
+                logger.error(f"Error updating completion message: {msg_error}")
+                # As a last resort, try to send a simple success message
+                try:
+                    if hasattr(message_obj, 'message') and hasattr(message_obj.message, 'chat'):
+                        await self.bot.send_message(
+                            chat_id=message_obj.message.chat.id,
+                            text=final_text,
+                            reply_markup=BotKeyboards.main_menu(True),
+                            parse_mode="Markdown"
+                        )
+                except Exception:
+                    pass  # Final fallback - just log the error
             
         except Exception as e:
             logger.error(f"Error executing boost with settings: {e}")
