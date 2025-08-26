@@ -630,16 +630,37 @@ class DatabaseManager:
     
     async def get_live_monitors(self, user_id: int) -> List[Dict[str, Any]]:
         """Get all live monitoring channels for a user"""
-        async with self._operation_lock:
-            connection = await self._ensure_connection()
-            cursor = await connection.execute("""
-                SELECT id, channel_link, title, active, last_checked, live_count, created_at
-                FROM live_monitoring
-                WHERE user_id = ?
-                ORDER BY created_at DESC
-            """, (user_id,))
-            rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                cursor = await connection.execute("""
+                    SELECT id, channel_link, title, active, last_checked, live_count, created_at
+                    FROM live_monitoring
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                """, (user_id,))
+                rows = await cursor.fetchall()
+                
+                # Safely convert rows to dictionaries
+                result = []
+                for row in rows:
+                    try:
+                        result.append({
+                            "id": row[0],
+                            "channel_link": row[1],
+                            "title": row[2],
+                            "active": bool(row[3]),
+                            "last_checked": row[4],
+                            "live_count": row[5] or 0,
+                            "created_at": row[6]
+                        })
+                    except Exception as row_error:
+                        logger.error(f"Error processing live monitor row: {row_error}")
+                        continue
+                return result
+        except Exception as e:
+            logger.error(f"Error getting live monitors for user {user_id}: {e}")
+            return []
     
     async def get_all_active_monitors(self) -> List[Dict[str, Any]]:
         """Get all active live monitoring channels"""

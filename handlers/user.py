@@ -1229,23 +1229,45 @@ Last Boosted: {last_boosted}
             return False
     
     async def safe_edit_message(self, callback_query: types.CallbackQuery, text: str, reply_markup=None, parse_mode="Markdown"):
-        """Safely edit message with proper error handling"""
-        if not callback_query.message:
-            return
-        
+        """Safely edit message with proper error handling and fallbacks"""
         try:
-            await callback_query.message.edit_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode
-            )
+            if callback_query.message and hasattr(callback_query.message, 'edit_text'):
+                await callback_query.message.edit_text(
+                    text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            else:
+                # Fallback: send new message if edit is not possible
+                if self.bot and callback_query.from_user:
+                    await self.bot.send_message(
+                        callback_query.from_user.id,
+                        text,
+                        reply_markup=reply_markup,
+                        parse_mode=parse_mode
+                    )
         except Exception as e:
-            if "message is not modified" in str(e):
-                # Silently ignore this harmless error
+            error_msg = str(e).lower()
+            if any(ignore_phrase in error_msg for ignore_phrase in [
+                "message is not modified", 
+                "message content and reply markup are exactly the same",
+                "message to edit not found"
+            ]):
+                # Silently ignore harmless errors
                 pass
             else:
                 logger.error(f"Error editing message: {e}")
-                raise e
+                # Try fallback message send
+                try:
+                    if self.bot and callback_query.from_user:
+                        await self.bot.send_message(
+                            callback_query.from_user.id,
+                            text,
+                            reply_markup=reply_markup,
+                            parse_mode=parse_mode
+                        )
+                except Exception as fallback_error:
+                    logger.error(f"Fallback message send also failed: {fallback_error}")
     
     # Live Management Methods
     async def show_live_management(self, callback_query: types.CallbackQuery):
@@ -1352,11 +1374,12 @@ Type `/cancel` to cancel."""
                 await processing_msg.edit_text("❌ Could not access channel. Make sure the link is correct and the channel is public.")
                 return
             
-            # Add to live monitoring
+            # Add to live monitoring with safe title handling
+            channel_title = channel_info.get("title") or channel_link
             success = await self.db.add_live_monitor(
                 user_id, 
                 channel_link, 
-                channel_info.get("title")
+                str(channel_title)
             )
             
             if success:
@@ -1720,26 +1743,20 @@ Select which option you want to vote for:
             logger.error(f"Error showing poll options: {e}")
             await message.answer("❌ Error displaying poll options")
     
-    async def execute_poll_vote(self, callback_query: types.CallbackQuery, data: str):
+    async def execute_poll_vote(self, callback_query: types.CallbackQuery, data: str, state: FSMContext = None):
         """Execute poll voting with all accounts"""
         try:
             # Extract option index from callback data
             option_index = int(data.split(":")[1])
             
-            # Get poll data from state
-            from aiogram.fsm.context import FSMContext
-            from aiogram.dispatcher.event.context import Context
-            
-            context = Context()
-            state = FSMContext(
-                storage=callback_query.bot.dispatcher.storage,  
-                key=callback_query.bot.dispatcher.storage.build_key(
-                    chat=callback_query.message.chat.id,
-                    user=callback_query.from_user.id
-                )
-            )
-            state_data = await state.get_data()
-            poll_data = state_data.get('poll_data', {})
+            # Get poll data from state if available
+            poll_data = {}
+            if state:
+                try:
+                    state_data = await state.get_data()
+                    poll_data = state_data.get('poll_data', {})
+                except Exception as state_error:
+                    logger.error(f"Error getting poll data from state: {state_error}")
             
             if not poll_data:
                 await callback_query.answer("❌ Poll data not found. Please try again.", show_alert=True)

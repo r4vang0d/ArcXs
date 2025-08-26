@@ -23,6 +23,7 @@ from telethon.tl.types import InputPeerChannel, InputPeerChat, InputPeerUser, Re
 
 from database import DatabaseManager, AccountStatus, LogType
 from config import Config
+from rate_limiter import rate_limiter
 
 logger = logging.getLogger(__name__)
 
