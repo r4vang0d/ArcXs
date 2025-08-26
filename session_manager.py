@@ -126,8 +126,9 @@ class TelethonManager:
             await verification_data['client'].disconnect()
             return False, "❌ Verification code expired. Please start the process again."
         except SessionPasswordNeededError:
-            await verification_data['client'].disconnect()
-            return False, "❌ Two-factor authentication detected. Please disable 2FA temporarily."
+            # Store client for 2FA handling - don't disconnect!
+            verification_data['needs_2fa'] = True
+            return False, "🔐 Two-factor authentication required. Please enter your 2FA password:", verification_data
         except FloodWaitError as e:
             await verification_data['client'].disconnect()
             return False, f"❌ Flood wait error: try again in {e.seconds} seconds"
@@ -138,6 +139,53 @@ class TelethonManager:
             except Exception:
                 pass  # Ignore disconnect errors during error handling
             return False, f"❌ Error: {str(e)}"
+    
+    async def complete_2fa_verification(self, verification_data: dict, password: str) -> Tuple[bool, str]:
+        """
+        Complete 2FA verification with the provided password
+        Returns (success, message)
+        """
+        try:
+            client = verification_data['client']
+            phone = verification_data['phone']
+            session_name = verification_data['session_name']
+            
+            # Sign in with 2FA password
+            user = await client.sign_in(password=password)
+            
+            if user and await client.is_user_authorized():
+                # Get user info
+                me = await client.get_me()
+                username = me.username if hasattr(me, 'username') and me.username else me.first_name
+                display_name = f"@{username}" if me.username else me.first_name
+                logger.info(f"Successfully logged in as {display_name} ({phone}) with 2FA")
+                
+                # Store client reference
+                self.clients[session_name] = client
+                self.active_clients.append(session_name)
+                
+                # Save to database with username
+                success = await self.db.add_account(phone, session_name, username)
+                if success:
+                    await self.db.log_action(
+                        LogType.JOIN,
+                        message=f"Account {display_name} added successfully with 2FA"
+                    )
+                    return True, f"✅ Account {display_name} added successfully!"
+                else:
+                    await client.disconnect()
+                    return False, "❌ Failed to save account to database"
+            else:
+                await client.disconnect()
+                return False, "❌ Failed to authorize account with 2FA"
+                
+        except Exception as e:
+            logger.error(f"Error completing 2FA verification for {phone}: {e}")
+            try:
+                await verification_data['client'].disconnect()
+            except Exception:
+                pass
+            return False, f"❌ 2FA Error: {str(e)}"
     
     async def remove_account(self, phone: str) -> Tuple[bool, str]:
         """Remove an account and cleanup sessions"""

@@ -7,12 +7,13 @@ The bot uses Aiogram for the main bot interface and Telethon for Telegram client
 # Recent Changes
 
 ## August 26, 2025
+- **2FA Authentication Support**: Completely redesigned 2FA handling to support two-factor authentication instead of asking users to disable it
+- **Private Invite Link Fix**: Added support for new Telegram private invite link format (https://t.me/+xxxxx) alongside existing formats
+- **Connection Management Improvements**: Fixed "Cannot send requests while disconnected" errors by improving Telethon client connection handling
+- **Callback Query Timeout Fix**: Implemented safe callback query handling to prevent timeout crashes from expired button interactions
+- **Enhanced Account Verification**: Added proper 2FA password state management and seamless verification flow
+- **Auto Mode Output Fix**: Resolved missing completion messages after auto reactions/boost operations complete
 - **Comprehensive State Management Fix**: Resolved all state clearing and callback routing issues causing empty state errors
-- **Emoji Reaction System Fix**: Fixed "Invalid reaction provided" error by updating emoji format to proper Unicode characters
-- **Enhanced Error Recovery**: Added fallback emoji reaction system and comprehensive error handling
-- **Database Method Addition**: Added missing get_active_account_count method to prevent crashes
-- **Session Recovery System**: Implemented robust state validation and restoration for interrupted sessions
-- **Improved User Experience**: Added clear error messages and navigation for expired sessions
 - **Production Stability**: Removed debug logging and optimized state persistence across all operations
 
 # User Preferences

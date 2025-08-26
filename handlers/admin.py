@@ -26,6 +26,7 @@ class AdminStates(StatesGroup):
     waiting_for_custom_api_id = State()
     waiting_for_custom_api_hash = State()
     waiting_for_verification_code = State()
+    waiting_for_2fa_password = State()
     waiting_for_channel_link = State()
     waiting_for_channel_reason = State()
     waiting_for_remove_channel = State()
@@ -106,6 +107,8 @@ class AdminHandler:
             await self.process_custom_api_hash(message, state)
         elif current_state == AdminStates.waiting_for_verification_code.state:
             await self.process_verification_code(message, state)
+        elif current_state == AdminStates.waiting_for_2fa_password.state:
+            await self.process_2fa_password(message, state)
         # Premium management states removed for personal use
         elif current_state == AdminStates.waiting_for_channel_link.state:
             await self.process_channel_link(message, state)
@@ -284,7 +287,7 @@ Send the code or /cancel to abort.
         processing_msg = await message.answer("⏳ Verifying code... Please wait.")
         
         try:
-            success, result_message = await self.telethon.complete_account_verification(verification_data, code)
+            success, result_message, updated_verification_data = await self.telethon.complete_account_verification(verification_data, code)
             
             await processing_msg.delete()
             
@@ -293,6 +296,16 @@ Send the code or /cancel to abort.
                     f"{result_message}\n\n🎉 Account successfully added and ready for use!",
                     reply_markup=BotKeyboards.account_management()
                 )
+            elif updated_verification_data and updated_verification_data.get('needs_2fa'):
+                # 2FA required - transition to 2FA state
+                await state.update_data(verification_data=updated_verification_data)
+                await state.set_state(AdminStates.waiting_for_2fa_password)
+                await message.answer(
+                    f"🔐 **Two-Factor Authentication Required**\n\n{result_message}\n\nEnter your 2FA password or /cancel to abort:",
+                    parse_mode="Markdown",
+                    reply_markup=BotKeyboards.cancel_operation()
+                )
+                return
             else:
                 await message.answer(
                     f"{result_message}\n\nPlease try again or /cancel to abort.",
@@ -305,6 +318,66 @@ Send the code or /cancel to abort.
             logger.error(f"Error completing verification: {e}")
             await message.answer(
                 "❌ An error occurred during verification. Please try again or /cancel",
+                reply_markup=BotKeyboards.cancel_operation()
+            )
+            return  # Don't clear state, allow retry
+        
+        await state.clear()
+    
+    async def process_2fa_password(self, message: types.Message, state: FSMContext):
+        """Process 2FA password input"""
+        if not message.text:
+            return
+        password = message.text.strip()
+        
+        if password == "/cancel":
+            # Clean up verification data
+            data = await state.get_data()
+            verification_data = data.get("verification_data")
+            if verification_data and verification_data.get('client'):
+                try:
+                    await verification_data['client'].disconnect()
+                except:
+                    pass
+            
+            await state.clear()
+            await message.answer("❌ Operation cancelled", reply_markup=BotKeyboards.account_management())
+            return
+        
+        # Get verification data from state
+        data = await state.get_data()
+        verification_data = data.get("verification_data")
+        
+        if not verification_data:
+            await message.answer("❌ Verification session expired. Please start again.", reply_markup=BotKeyboards.account_management())
+            await state.clear()
+            return
+        
+        # Show processing message
+        processing_msg = await message.answer("🔐 Verifying 2FA password... Please wait.")
+        
+        try:
+            success, result_message = await self.telethon.complete_2fa_verification(verification_data, password)
+            
+            await processing_msg.delete()
+            
+            if success:
+                await message.answer(
+                    f"{result_message}\n\n🎉 Account successfully added with 2FA authentication!",
+                    reply_markup=BotKeyboards.account_management()
+                )
+            else:
+                await message.answer(
+                    f"{result_message}\n\nPlease try again or /cancel to abort.",
+                    reply_markup=BotKeyboards.cancel_operation()
+                )
+                return  # Don't clear state, allow retry
+        
+        except Exception as e:
+            await processing_msg.delete()
+            logger.error(f"Error completing 2FA verification: {e}")
+            await message.answer(
+                "❌ An error occurred during 2FA verification. Please try again or /cancel",
                 reply_markup=BotKeyboards.cancel_operation()
             )
             return  # Don't clear state, allow retry
