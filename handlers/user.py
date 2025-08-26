@@ -718,7 +718,11 @@ Select your preferred mode:
                 return
             
             state_data = await state.get_data()
-            channel_link = state_data.get("boost_channel_link")
+            # Get the appropriate channel link based on feature type
+            if feature_type == "boost":
+                channel_link = state_data.get("boost_channel_link")
+            else:  # reactions
+                channel_link = state_data.get("reaction_channel_link")
             
             if mode == "auto":
                 # Auto mode - get recent messages automatically
