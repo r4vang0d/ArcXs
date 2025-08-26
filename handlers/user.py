@@ -91,7 +91,7 @@ class UserHandler:
         elif data == "poll_history":
             await self.show_poll_history(callback_query)
         elif data.startswith("vote_option:"):
-            await self.execute_poll_vote(callback_query, data)
+            await self.execute_poll_vote(callback_query, data, state)
         elif data.startswith("channel_info:"):
             await self.show_channel_info(callback_query, data)
         elif data.startswith("remove_channel:"):
@@ -2084,23 +2084,23 @@ Select which option you want to vote for:
             logger.error(f"Error showing poll options: {e}")
             await message.answer("❌ Error displaying poll options")
     
-    async def execute_poll_vote(self, callback_query: types.CallbackQuery, data: str, state: FSMContext = None):
+    async def execute_poll_vote(self, callback_query: types.CallbackQuery, data: str, state: FSMContext):
         """Execute poll voting with all accounts"""
         try:
             # Extract option index from callback data
             option_index = int(data.split(":")[1])
             
-            # Get poll data from state if available
-            poll_data = {}
-            if state:
-                try:
-                    state_data = await state.get_data()
-                    poll_data = state_data.get('poll_data', {})
-                except Exception as state_error:
-                    logger.error(f"Error getting poll data from state: {state_error}")
+            # Get poll data from state
+            try:
+                state_data = await state.get_data()
+                poll_data = state_data.get('poll_data', {})
+            except Exception as state_error:
+                logger.error(f"Error getting poll data from state: {state_error}")
+                await callback_query.answer("❌ Error retrieving poll data. Please try again.", show_alert=True)
+                return
             
             if not poll_data:
-                await callback_query.answer("❌ Poll data not found. Please try again.", show_alert=True)
+                await callback_query.answer("❌ Poll data not found. Please start poll voting again.", show_alert=True)
                 return
             
             selected_option = poll_data['options'][option_index]

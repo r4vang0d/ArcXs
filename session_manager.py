@@ -864,8 +864,16 @@ class TelethonManager:
                 return None
             
             poll = message.media.poll
+            
+            # Extract text from TextWithEntities objects
+            question_text = poll.question
+            if hasattr(question_text, 'text'):
+                question_text = question_text.text
+            elif hasattr(question_text, '__str__'):
+                question_text = str(question_text)
+            
             poll_data = {
-                'question': poll.question,
+                'question': question_text,
                 'options': [],
                 'message_id': message_id,
                 'message_url': url,
@@ -876,8 +884,15 @@ class TelethonManager:
             
             # Extract poll options
             for i, answer in enumerate(poll.answers):
+                # Extract text from TextWithEntities objects
+                answer_text = answer.text
+                if hasattr(answer_text, 'text'):
+                    answer_text = answer_text.text
+                elif hasattr(answer_text, '__str__'):
+                    answer_text = str(answer_text)
+                
                 option_data = {
-                    'text': answer.text,
+                    'text': answer_text,
                     'option': answer.option,
                     'voter_count': 0  # Will be updated when we get poll results
                 }
