@@ -1096,6 +1096,7 @@ class TelethonManager:
 
     async def _maintain_group_call_connection(self, client, session_name, group_call, group_call_info):
         """Maintain group call connection and prevent automatic disconnection"""
+        import time
         call_id = group_call_info['id']
         logger.info(f"🔄 Starting connection maintenance for {session_name} in group call {call_id}")
         

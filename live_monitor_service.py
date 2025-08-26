@@ -28,6 +28,10 @@ class LiveMonitorService:
             logger.info("Live monitoring service is already running")
             return
         
+        # Clear previously attempted calls to allow fresh attempts
+        self.joined_calls.clear()
+        logger.info("🧹 Cleared previously attempted group calls for fresh attempts")
+        
         self.is_running = True
         self.monitor_task = asyncio.create_task(self._monitor_loop())
         logger.info("🔴 Live monitoring service started")
@@ -90,25 +94,33 @@ class LiveMonitorService:
             channel_link = monitor['channel_link']
             monitor_id = monitor['id']
             
+            logger.info(f"🔎 Checking monitor {monitor_id} for {channel_link}")
+            
             # Check if channel has live stream
             has_live, group_call_info = await self.telethon.check_channel_for_live_stream(channel_link)
+            logger.info(f"📡 Live check result for {channel_link}: has_live={has_live}, group_call_info={group_call_info}")
             
             if has_live:
                 logger.info(f"🔴 LIVE STREAM DETECTED in {channel_link}!")
                 
                 # Check if we've already joined this specific group call
                 call_id = group_call_info.get('id') if group_call_info else None
+                logger.info(f"🔍 Checking group call {call_id} - joined_calls: {self.joined_calls}")
+                
                 if call_id and call_id in self.joined_calls:
-                    logger.debug(f"Already attempted to join group call {call_id}, skipping...")
+                    logger.info(f"⏭️ Already attempted to join group call {call_id}, skipping...")
                     await self.db.update_live_monitor_check(monitor_id, live_detected=True)
                     return
                 
                 # Get user's preferred account count for live streams
                 user_id = monitor['user_id']
                 user_account_preference = await self._get_user_live_account_count(user_id)
+                logger.info(f"👤 User {user_id} account preference: {user_account_preference}")
                 
                 # Join the live stream with specified or all accounts
+                logger.info(f"🚀 Attempting to join live stream in {channel_link} with {user_account_preference or 'ALL'} accounts")
                 result = await self.telethon.join_live_stream(channel_link, group_call_info, user_account_preference)
+                logger.info(f"📊 Join result: {result}")
                 
                 # Only mark as attempted if we actually succeeded or if it's permanently invalid
                 if call_id and (result['success'] or "invalid" in result.get('message', '').lower()):
