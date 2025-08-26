@@ -74,7 +74,7 @@ class ViewBoosterBot:
         # Check if user is admin - block non-admins
         if not self.config.is_admin(user_id):
             await message.answer(
-                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                "🚫 **ARCX - Access Restricted**\n\n⚠️ This is a premium personal bot.\n🔐 Authorized users only.",
                 parse_mode="Markdown"
             )
             return
@@ -83,22 +83,29 @@ class ViewBoosterBot:
         await self.db.add_user(user_id, premium=True)
         
         welcome_text = f"""
-🎯 **Personal View Booster Bot**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════
 
-👋 Welcome back **{message.from_user.first_name or 'Admin'}**! 
+                **🚀 A R C X 🚀**
+        **The Ultimate View Booster**
 
-🚀 Your personal Telegram channel management system with advanced automation.
+═══════════════════════════════════
 
-🛠 **Available Features:**
-📱 Manage Telethon accounts
-🎯 Add & manage channels
-⚡ Boost channel views instantly
-💚 Monitor system health
-📊 View detailed analytics & logs
-⚙️ Configure boost settings
+👋 **Welcome back, {message.from_user.first_name or 'Admin'}!**
 
-🎛 **Ready to manage your channels?**
+✨ **Premium Features Unlocked:**
+
+🎯 **Channel Management** - Add unlimited channels
+⚡ **Instant Boosting** - Boost views in real-time  
+🎭 **Smart Reactions** - Auto emoji reactions
+📊 **Advanced Analytics** - Detailed performance stats
+📱 **Account Control** - Manage multiple accounts
+💚 **Health Monitoring** - System status tracking
+🔴 **Live Management** - Real-time monitoring
+🗳️ **Poll Automation** - Automated poll voting
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎛️ **Ready to dominate your channels?**
         """
         
         await message.answer(
@@ -116,47 +123,62 @@ class ViewBoosterBot:
         # Check if user is admin
         if not self.config.is_admin(user_id):
             await message.answer(
-                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                "🚫 **ARCX - Access Restricted**\n\n⚠️ This is a premium personal bot.\n🔐 Authorized users only.",
                 parse_mode="Markdown"
             )
             return
         
         help_text = """
-📚 **Personal Bot Help & Commands**
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════
 
-🤖 **Available Commands:**
-• `/start` - Launch bot and main menu
-• `/help` - Show this help guide
-• `/stats` - View your statistics
+                **🚀 A R C X 🚀**
+           **Help & Documentation**
 
-🎯 **How to Use:**
+═══════════════════════════════════
 
-**1️⃣ Add Channel**
-📢 Add unlimited channels for boosting
+🎮 **Quick Commands:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• `/start` - Launch main dashboard
+• `/help` - Show this help guide  
+• `/stats` - View performance metrics
 
-**2️⃣ Boost Views** 
-⚡ Select channel and boost message views instantly
+🎯 **Core Features Guide:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**3️⃣ Manage Accounts**
-📱 Add/remove Telethon accounts for automation
+**📢 Channel Management**
+• Add unlimited channels instantly
+• Support for all Telegram link formats
+• Bulk channel operations
 
-**4️⃣ Monitor System**
-💚 Track account health and system logs
+**⚡ Smart Boosting**
+• Real-time view boosting
+• Intelligent account rotation
+• Customizable delay settings
 
-📱 **Supported Link Formats:**
+**📊 Advanced Analytics**
+• Detailed boost statistics
+• Account health monitoring
+• Performance tracking
+
+**🎭 Automation Suite**
+• Auto emoji reactions
+• Poll voting automation
+• Live monitoring system
+
+🔗 **Supported Formats:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • `https://t.me/channel_name`
-• `https://t.me/joinchat/invite_code`
+• `https://t.me/joinchat/code`
 • `@channel_name`
 • `channel_name`
 
-⚙️ **Advanced Settings:**
-• 👁️ Views Only vs 👁️📖 Views + Read
-• 🔄 Account Rotation ON/OFF
-• ⏱️ Delay levels (🐇 Fast / 🚶 Medium / 🐢 Safe)
-• 📊 Detailed analytics and logging
+⚙️ **Performance Modes:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• 🚀 **Fast Mode** - Maximum speed
+• ⚡ **Balanced** - Optimal performance
+• 🛡️ **Safe Mode** - Maximum security
 
-💡 **Personal Use Only** - All features available without limits.
+✨ **Unlimited Access** - All premium features enabled
         """
         
         await message.answer(help_text, parse_mode="Markdown")
@@ -170,7 +192,7 @@ class ViewBoosterBot:
         # Check if user is admin
         if not self.config.is_admin(user_id):
             await message.answer(
-                "❌ **Access Denied**\n\nThis bot is for personal use only.",
+                "🚫 **ARCX - Access Restricted**\n\n⚠️ This is a premium personal bot.\n🔐 Authorized users only.",
                 parse_mode="Markdown"
             )
             return
@@ -181,13 +203,19 @@ class ViewBoosterBot:
         total_boosts = sum(channel.get("total_boosts", 0) for channel in channels)
         
         stats_text = f"""
-📊 **Your Personal Bot Statistics**
+═══════════════════════════════════
 
-👤 **Account Type**: Personal Admin ⭐
-📢 **Channels**: {total_channels} (Unlimited)
-⚡ **Total Boosts**: {total_boosts:,}
+                **🚀 A R C X 🚀**
+          **Performance Dashboard**
 
-📈 **Recent Activity:**
+═══════════════════════════════════
+
+👤 **Account Status:** Premium Admin ⭐
+📢 **Channels Managed:** {total_channels} (Unlimited)
+⚡ **Total Boosts Delivered:** {total_boosts:,}
+
+📈 **Recent Channel Activity:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         """
         
         # Add recent channels
@@ -224,7 +252,7 @@ class ViewBoosterBot:
             if self.config.is_admin(user_id):
                 await self.user_handler.handle_callback(callback_query, state)
             else:
-                await callback_query.answer("❌ Access denied. Personal use only.", show_alert=True)
+                await callback_query.answer("🚫 ARCX - Access Restricted. Authorized users only.", show_alert=True)
             
         except Exception as e:
             logger.error(f"Error handling callback {data}: {e}")
