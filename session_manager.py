@@ -846,17 +846,45 @@ class TelethonManager:
                             from telethon.tl.types import DataJSON
                             import random
                             import json
+                            import time
+                            import hashlib
                             
                             me = await client.get_me()
                             
-                            # More realistic WebRTC parameters
-                            ssrc = random.randint(1000000000, 9999999999)
+                            # Generate unique WebRTC parameters for each account
+                            # Use account ID, session name, timestamp, and group call ID for uniqueness
+                            unique_seed = f"{me.id}_{session_name}_{int(time.time())}_{group_call_info['id']}"
+                            hash_seed = hashlib.md5(unique_seed.encode()).hexdigest()
+                            
+                            # Create deterministic but unique SSRC based on account
+                            base_ssrc = int(hash_seed[:8], 16) % 1000000000 + 1000000000
+                            
+                            # Generate unique ICE parameters
+                            ufrag_suffix = hash_seed[:7]
+                            pwd_suffix = hash_seed[7:17]
+                            
                             webrtc_params = {
-                                "ufrag": f"tg{random.randint(1000000, 9999999)}",
-                                "pwd": f"tg{random.randint(1000000000, 9999999999)}",
-                                "ssrc": ssrc,
-                                "ssrc-audio": ssrc,
-                                "ssrc-video": ssrc + 1
+                                "ufrag": f"tg{ufrag_suffix}",
+                                "pwd": f"tg{pwd_suffix}{random.randint(100000, 999999)}",
+                                "ssrc": base_ssrc,
+                                "ssrc-audio": base_ssrc,
+                                "ssrc-video": base_ssrc + 1,
+                                "fingerprint": {
+                                    "hash": "sha-256",
+                                    "fingerprint": f"A{hash_seed[17:].upper()[:47]}",
+                                    "setup": "active"
+                                },
+                                "candidates": [
+                                    {
+                                        "foundation": "1",
+                                        "component": 1,
+                                        "protocol": "udp",
+                                        "priority": 2113667326 + (me.id % 1000),
+                                        "ip": "127.0.0.1",
+                                        "port": 9,
+                                        "type": "host"
+                                    }
+                                ]
                             }
                             params = DataJSON(data=json.dumps(webrtc_params))
                             
@@ -875,9 +903,26 @@ class TelethonManager:
                             accounts_joined += 1
                             logger.info(f"🎤 Account {session_name} joined GROUP CALL in {channel_link}")
                             
+                            # Add connection persistence tracking
+                            if not hasattr(self, 'active_group_calls'):
+                                self.active_group_calls = {}
+                            
+                            self.active_group_calls[session_name] = {
+                                'group_call': group_call,
+                                'group_call_info': group_call_info,
+                                'entity': entity,
+                                'joined_at': time.time(),
+                                'webrtc_params': webrtc_params
+                            }
+                            
                             # Start speaking management for this account
                             asyncio.create_task(self._manage_group_call_speaking(
                                 client, session_name, group_call, group_call_info, entity
+                            ))
+                            
+                            # Start connection maintenance for this account
+                            asyncio.create_task(self._maintain_group_call_connection(
+                                client, session_name, group_call, group_call_info
                             ))
                         
                         except Exception as group_call_error:
@@ -1048,6 +1093,63 @@ class TelethonManager:
                 
         except Exception as e:
             logger.error(f"Error in random mute/unmute behavior for {session_name}: {e}")
+
+    async def _maintain_group_call_connection(self, client, session_name, group_call, group_call_info):
+        """Maintain group call connection and prevent automatic disconnection"""
+        call_id = group_call_info['id']
+        logger.info(f"🔄 Starting connection maintenance for {session_name} in group call {call_id}")
+        
+        try:
+            # Keep connection alive by periodically checking status
+            maintenance_interval = random.randint(120, 300)  # 2-5 minutes
+            max_maintenance_duration = 3600  # 1 hour max
+            start_time = time.time()
+            
+            while (time.time() - start_time) < max_maintenance_duration:
+                await asyncio.sleep(maintenance_interval)
+                
+                try:
+                    # Check if we're still in the group call
+                    from telethon.tl.functions.phone import GetGroupCallRequest
+                    call_info = await client(GetGroupCallRequest(call=group_call, limit=1))
+                    
+                    if call_info and call_info.call:
+                        logger.debug(f"🟢 Connection maintained for {session_name} in group call {call_id}")
+                        
+                        # Occasionally send a small update to maintain presence
+                        if random.randint(1, 4) == 1:  # 25% chance
+                            try:
+                                me = await client.get_me()
+                                await client(EditGroupCallParticipantRequest(
+                                    call=group_call,
+                                    participant=me,
+                                    muted=True  # Keep muted to avoid spam
+                                ))
+                                logger.debug(f"🔄 Sent presence update for {session_name}")
+                            except Exception as presence_error:
+                                logger.debug(f"Presence update failed for {session_name}: {presence_error}")
+                    else:
+                        logger.info(f"🔴 Group call {call_id} ended, stopping maintenance for {session_name}")
+                        break
+                        
+                except Exception as check_error:
+                    error_str = str(check_error).lower()
+                    if "ended" in error_str or "not found" in error_str:
+                        logger.info(f"🔴 Group call {call_id} ended, stopping maintenance for {session_name}")
+                        break
+                    else:
+                        logger.warning(f"⚠️ Connection check failed for {session_name}: {check_error}")
+                        
+                # Adjust maintenance interval randomly
+                maintenance_interval = random.randint(120, 300)
+                
+        except Exception as e:
+            logger.error(f"Error in connection maintenance for {session_name}: {e}")
+        finally:
+            # Clean up tracking
+            if hasattr(self, 'active_group_calls') and session_name in self.active_group_calls:
+                del self.active_group_calls[session_name]
+                logger.info(f"🧹 Cleaned up connection tracking for {session_name}")
 
     async def get_poll_from_url(self, url: str) -> dict:
         """Fetch poll data from Telegram URL"""
