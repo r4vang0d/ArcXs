@@ -5,7 +5,7 @@ Handles channel management, boosting, and settings
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Optional, Any
 
 from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
@@ -2592,3 +2592,24 @@ Select how quickly you want the views to be delivered.
         except Exception as e:
             logger.error(f"Error in batched reactions execution: {e}")
             return False, f"Error during reactions: {str(e)}", 0
+    
+    async def set_user_setting(self, user_id: int, setting_name: str, value: Any) -> bool:
+        """Set a specific user setting"""
+        try:
+            # Get current settings
+            user = await self.db.get_user(user_id)
+            if not user:
+                return False
+            
+            settings = Utils.parse_user_settings(user.get("settings", "{}"))
+            settings[setting_name] = value
+            
+            # Update settings in database
+            return await self.db.update_user_settings(user_id, settings)
+        except Exception as e:
+            logger.error(f"Error setting user setting {setting_name}: {e}")
+            return False
+    
+    async def update_user_setting(self, user_id: int, setting_name: str, value: Any) -> bool:
+        """Update a specific user setting (alias for set_user_setting)"""
+        return await self.set_user_setting(user_id, setting_name, value)

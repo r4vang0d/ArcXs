@@ -4,6 +4,7 @@ Uses SQLite for local data storage
 """
 import aiosqlite
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
@@ -611,7 +612,7 @@ class DatabaseManager:
             return True  # Allow by default if not in control list
     
     # Live monitoring methods
-    async def add_live_monitor(self, user_id: int, channel_link: str, title: str = None) -> bool:
+    async def add_live_monitor(self, user_id: int, channel_link: str, title: Optional[str] = None) -> bool:
         """Add a channel to live monitoring"""
         try:
             async with self._operation_lock:
@@ -735,6 +736,23 @@ class DatabaseManager:
                 return True
         except Exception as e:
             logger.error(f"Error toggling live monitor: {e}")
+            return False
+    
+    async def update_user_settings(self, user_id: int, settings: Dict[str, Any]) -> bool:
+        """Update user settings in database"""
+        try:
+            async with self._operation_lock:
+                connection = await self._ensure_connection()
+                settings_json = json.dumps(settings)
+                await connection.execute(
+                    "UPDATE users SET settings = ? WHERE id = ?",
+                    (settings_json, user_id)
+                )
+                await connection.commit()
+                logger.info(f"Updated settings for user {user_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Error updating user settings: {e}")
             return False
     
     async def close(self):
