@@ -808,6 +808,8 @@ class TelethonManager:
         if max_accounts and max_accounts > 0:
             accounts_to_use = self.active_clients[:max_accounts]
             logger.info(f"Using {len(accounts_to_use)} out of {len(self.active_clients)} accounts for live stream joining")
+        else:
+            logger.info(f"Using ALL {len(self.active_clients)} accounts for live stream joining")
         
         try:
             for session_name in accounts_to_use:
