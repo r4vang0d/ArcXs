@@ -1250,13 +1250,23 @@ Last Boosted: {last_boosted}
     # Live Management Methods
     async def show_live_management(self, callback_query: types.CallbackQuery):
         """Show live management menu"""
-        await callback_query.answer()
-        
-        monitors = await self.db.get_live_monitors(callback_query.from_user.id)
-        active_count = len([m for m in monitors if m.get('active', False)])
-        total_count = len(monitors)
-        
-        text = f"""🔴 **Live Stream Management**
+        try:
+            await callback_query.answer()
+            
+            # Try to get monitors with error handling
+            try:
+                monitors = await self.db.get_live_monitors(callback_query.from_user.id)
+                if monitors is None:
+                    monitors = []
+                active_count = len([m for m in monitors if m.get('active', False)])
+                total_count = len(monitors)
+            except Exception as db_error:
+                logger.error(f"Database error getting live monitors: {db_error}")
+                monitors = []
+                active_count = 0
+                total_count = 0
+            
+            text = f"""🔴 **Live Stream Management**
 
 📊 **Status Overview:**
 • Total Monitored: {total_count} channels
@@ -1271,11 +1281,23 @@ The bot continuously monitors your selected channels for live streams and automa
 • Real-time monitoring status
 • Professional live stream detection"""
 
-        await self.safe_edit_message(
-            callback_query,
-            text,
-            reply_markup=BotKeyboards.live_management()
-        )
+            # Create keyboard safely
+            try:
+                keyboard = BotKeyboards.live_management()
+            except Exception as keyboard_error:
+                logger.error(f"Error creating live management keyboard: {keyboard_error}")
+                # Fallback to simple back button
+                keyboard = BotKeyboards.back_button("main_menu")
+
+            await self.safe_edit_message(
+                callback_query,
+                text,
+                reply_markup=keyboard
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in show_live_management: {e}")
+            await callback_query.answer("❌ Error loading live management. Please try again.", show_alert=True)
     
     async def start_add_live_channel(self, callback_query: types.CallbackQuery, state: FSMContext):
         """Start adding a channel for live monitoring"""

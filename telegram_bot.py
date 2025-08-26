@@ -289,8 +289,9 @@ class ViewBoosterBot:
             # Load existing Telethon sessions
             await self.telethon_manager.load_existing_sessions()
             
-            # Start live monitoring service
-            await self.live_monitor.start_monitoring()
+            # Start live monitoring service only if there are monitors configured
+            # This prevents auto-start spam when no channels are being monitored
+            # await self.live_monitor.start_monitoring()
             
             # Start polling
             logger.info("Bot started successfully!")
