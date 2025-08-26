@@ -1097,31 +1097,60 @@ class TelethonManager:
             logger.error(f"Error in speaking management for {session_name}: {e}")
     
     async def _request_to_speak(self, client, session_name, group_call):
-        """Request speaking permission in group call"""
+        """Request speaking permission in group call using 'raise hand' method"""
         try:
-            from telethon.tl.functions.phone import EditGroupCallParticipantRequest
+            from telethon.tl.functions.phone import EditGroupCallParticipantRequest, GetGroupCallRequest
             
-            # Try to unmute (request to speak)
+            # Step 1: Raise hand to request speaking permission
             me = await client.get_me()
+            logger.info(f"✋ Account {session_name} raising hand to request speaking permission")
+            
             await client(EditGroupCallParticipantRequest(
                 call=group_call,
                 participant=me,
-                muted=False  # Request to unmute (speak)
+                raise_hand=True  # Raise hand to request permission (as mentioned in the guide)
             ))
             
-            # Wait a moment and check if we're actually unmuted
-            await asyncio.sleep(2)
+            # Step 2: Wait for admin response (5-15 seconds)
+            wait_time = random.randint(5, 15)
+            logger.info(f"⏳ Account {session_name} waiting {wait_time}s for admin response")
+            await asyncio.sleep(wait_time)
             
-            # For simulation purposes, randomly grant/deny (70% grant rate)
-            # In real scenario, this would depend on admin approval
-            granted = random.random() < 0.7
-            
-            if granted:
-                logger.info(f"🎤 Account {session_name} speaking request GRANTED")
-                return True
-            else:
-                logger.info(f"🔇 Account {session_name} speaking request DENIED by admin")
+            # Step 3: Check if we got permission by querying call participants
+            try:
+                call_info = await client(GetGroupCallRequest(
+                    call=group_call,
+                    limit=100
+                ))
+                
+                # Look for our account in participants
+                for participant in call_info.participants:
+                    if hasattr(participant, 'peer') and participant.peer.user_id == me.id:
+                        if not participant.muted:
+                            logger.info(f"✅ Account {session_name} speaking permission GRANTED by admin")
+                            return True
+                        else:
+                            logger.info(f"❌ Account {session_name} still muted - request denied or pending")
+                            return False
+                
+                # If not found in participants or still muted
+                logger.info(f"❌ Account {session_name} not found as speaker - request denied")
                 return False
+                
+            except Exception as check_error:
+                logger.warning(f"⚠️ Could not verify speaking status for {session_name}: {check_error}")
+                # Fallback: try to unmute directly
+                try:
+                    await client(EditGroupCallParticipantRequest(
+                        call=group_call,
+                        participant=me,
+                        muted=False
+                    ))
+                    logger.info(f"🎤 Account {session_name} attempted direct unmute")
+                    return True
+                except:
+                    logger.info(f"🔇 Account {session_name} direct unmute failed - likely denied")
+                    return False
                 
         except Exception as e:
             logger.error(f"Error requesting to speak for {session_name}: {e}")

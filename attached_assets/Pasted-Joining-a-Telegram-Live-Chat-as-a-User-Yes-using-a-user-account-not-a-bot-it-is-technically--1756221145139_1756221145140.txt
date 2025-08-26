@@ -1,0 +1,40 @@
+Joining a Telegram Live Chat as a User
+
+Yes – using a user account (not a bot), it is technically possible to programmatically join a Telegram channel’s live voice/video chat and interact (raise hand, speak, etc.) by using MTProto libraries like Telethon and the WebRTC-based tgcalls/PyTgCalls libraries. The Bot API cannot do this – only user (MTProto) clients can use phone.joinGroupCall and related methods. In practice you would use Telethon (or Pyrogram) together with a voice-chat library like PyTgCalls (MarshalX’s tgcalls/pytgcalls) which handles the low-level WebRTC audio.
+
+Below is an outline of how each step can be done, with references to existing examples and docs:
+
+Join the live chat: Use Telethon’s phone.JoinGroupCallRequest (via a wrapper library) to join the voice chat (muted as listener). PyTgCalls provides a high-level interface: e.g.
+
+client = TelegramClient('session', api_id, api_hash).start()
+app = PyTgCalls(client)
+app.start()
+app.join_group_call(chat_id, InputStream(InputAudioStream('silence.raw')), stream_type=StreamType().local_stream)
+idle()
+
+(See a StackOverflow example and the PyTgCalls demo.) Under the hood this calls Telethon’s phone.joinGroupCall.  Telethon’s docs show JoinGroupCallRequest is only for user accounts.  The tgcalls library (C++/Python) sets up the WebRTC stream automatically. Marshal’s answer confirms this approach: “use WebRTC client for Telegram group call… It works with Telethon”.
+
+Request to speak (“raise hand”): Once in the chat (muted), you can send a raise hand request by calling Telethon’s EditGroupCallParticipantRequest with the raise_hand=True flag for yourself. Telethon’s API explicitly supports a raise_hand boolean. In code you might do:
+
+await client(functions.phone.EditGroupCallParticipantRequest(
+    call=input_group_call,
+    participant='me',          # InputPeer of yourself
+    raise_hand=True
+))
+
+This tells the server you are requesting to speak. (The UI’s “raise hand” button does the same under the hood.) Note this only works if you are already in the call and muted (as listeners often are). Telethon’s reference shows raise_hand: flags.2? Bool available.
+
+Detect approval/denial: There is no dedicated “request denied” message. Instead, you can poll or listen for participant updates. If the admin approves you, you will become an unmuted speaker in the call. At that point, Telethon will see you in the live call’s participant list as unmuted. You can use Telethon’s phone.GetGroupCallRequest or updates to check: for example, after raising hand you could call
+
+res = await client(functions.phone.GetGroupCallRequest(
+    call=input_group_call, limit=100
+))
+
+and see if your user appears in res.call/res.participants with muted=False.  (Telethon’s GetGroupCallRequest returns a phone.groupCall object including all current participants.) If you appear with muted=False, it means you were approved. If you remain absent or still muted after a reasonable time, assume it was denied or ignored. PyTgCalls also emits events on participant changes, but the key is that the API update will reflect approval. Marshal’s tgcalls library abstracts this, but under the hood it is watching the same updates.
+
+Simulate speaking (mute/unmute): Once approved, your account is a speaker and not muted by the admin. To simulate talking, you can programmatically toggle mute/unmute. Using Telethon, you can call EditGroupCallParticipantRequest(call, participant='me', muted=False) to unmute yourself, then later call it again with muted=True to mute yourself. (PyTgCalls offers pause_stream()/resume_stream() or simply stop/start audio to similar effect.) These calls control your own mute status. By toggling muted on and off at random intervals, you emulate speaking bursts. PyTgCalls even tracks speaking levels and can adjust volume, but mute toggling via Telethon works too.
+
+If denied: If the admin does not approve your request, nothing changes: you remain in the call muted (as listener). Your script can simply keep listening to updates or timeout. You should not attempt to speak unless you see that approval (i.e. you become unmuted).
+
+
+Libraries and Tools
